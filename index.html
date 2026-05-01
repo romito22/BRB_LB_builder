@@ -7,98 +7,89 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app-shell">
+  <div id="app" class="app-shell">
     <header class="top-toolbar">
       <div class="brand-wrap">
-        <img src="assets/logo_brb.png" alt="BRB LB" class="logo" onerror="document.getElementById('logoFallback').style.display='inline-flex';this.style.display='none'" />
+        <img src="assets/logo_brb.png" alt="BRB LB" class="logo" onerror="document.getElementById('logoFallback').classList.remove('hidden');this.style.display='none'" />
         <span id="logoFallback" class="logo-fallback hidden">BRB</span>
         <div>
           <h1>BRB_LB Builder</h1>
-          <p>Structural frame data builder</p>
+          <p id="projectMeta">Structural frame data builder</p>
         </div>
       </div>
-      <div class="toolbar-actions" role="toolbar" aria-label="Project tools">
-        <button id="newProjectBtn" type="button">New Project</button>
-        <button id="columnToolBtn" type="button" class="tool-button active" aria-pressed="true">Column</button>
-        <button id="exportCsvBtn" type="button">Export CSV</button>
+      <div class="toolbar-actions" role="toolbar" aria-label="Drawing tools">
+        <button type="button" data-tool="select">Select</button>
+        <button type="button" data-tool="column">Add Column</button>
+        <button type="button" data-tool="beam">Add Beam</button>
+        <button type="button" data-tool="brb">Add BRB</button>
+        <button type="button" data-tool="gusset">Add Gusset Plate</button>
+        <button type="button" id="deleteSelectedBtn">Delete Selected</button>
+        <button type="button" id="exportCsvBtn">Export CSV</button>
       </div>
     </header>
 
-    <aside class="left-sidebar" aria-label="Project sidebar">
+    <aside class="left-sidebar" aria-label="Element library">
+      <section class="sidebar-section">
+        <h2>Element Library</h2>
+        <button type="button" class="library-card" data-tool="column">
+          <span class="library-symbol column"></span>
+          <span><strong>Column</strong><small>Drag and snap to grid</small></span>
+        </button>
+        <button type="button" class="library-card" data-tool="beam">
+          <span class="library-symbol beam"></span>
+          <span><strong>Beam</strong><small>Click start and end grid points</small></span>
+        </button>
+        <button type="button" class="library-card" data-tool="brb">
+          <span class="library-symbol brb"></span>
+          <span><strong>BRB Brace</strong><small>Red diagonal brace input</small></span>
+        </button>
+        <button type="button" class="library-card" data-tool="gusset">
+          <span class="library-symbol gusset"></span>
+          <span><strong>Gusset Plate</strong><small>Attach to grid point</small></span>
+        </button>
+      </section>
+
       <section class="sidebar-section">
         <h2>Project</h2>
         <dl class="project-facts">
           <div><dt>Name</dt><dd id="projectNameValue">Not set</dd></div>
           <div><dt>X Grid</dt><dd id="xLabelsValue">-</dd></div>
           <div><dt>Y Grid</dt><dd id="yLabelsValue">-</dd></div>
+          <div><dt>Levels</dt><dd id="levelsValue">-</dd></div>
         </dl>
-      </section>
-      <section class="sidebar-section">
-        <h2>Elements</h2>
-        <button id="sidebarColumnTool" type="button" class="tool-row active">
-          <span class="tool-dot"></span>
-          Column
-        </button>
-      </section>
-      <section class="sidebar-section">
-        <h2>Counts</h2>
-        <p class="metric"><span id="columnCount">0</span><small>columns</small></p>
       </section>
     </aside>
 
-    <main class="central-canvas" aria-label="Frame canvas">
+    <main class="central-canvas" aria-label="SVG drawing canvas">
       <div class="canvas-head">
         <div>
-          <h2 id="canvasTitle">Frame Layout</h2>
-          <p id="canvasSubtitle">Create a project to render the grid.</p>
+          <h2>Frame Layout</h2>
+          <p id="modeHint">Create a project grid to begin.</p>
         </div>
-        <span id="selectedBadge" class="selected-badge">No point selected</span>
+        <span id="selectedBadge" class="selected-badge">No element selected</span>
       </div>
       <div class="canvas-stage">
-        <div class="empty-state" id="emptyState">Set up X and Y grid labels to begin placing structural columns.</div>
-        <svg id="frameCanvas" class="frame-canvas" role="img" aria-label="Structural frame grid"></svg>
+        <svg id="frameCanvas" class="frame-canvas" role="img" aria-label="Structural frame SVG canvas"></svg>
       </div>
     </main>
 
-    <aside class="right-properties-panel" id="propertiesPanel" aria-label="Properties panel">
+    <aside class="right-properties-panel" aria-label="Properties panel">
       <h2>Properties</h2>
-      <div id="propertiesEmpty" class="panel-empty">
-        Select a grid intersection to place or edit a column.
-      </div>
-      <form id="columnForm" class="property-form hidden">
-        <div class="selection-summary">
-          <span>Selected Grid Point</span>
-          <strong id="selectedLocation">-</strong>
-        </div>
-        <label>Mark
-          <input id="colMark" autocomplete="off" placeholder="CB-8.00" required />
-        </label>
-        <label>Size
-          <input id="colSize" autocomplete="off" placeholder="W14X120" required />
-        </label>
-        <div class="form-grid">
-          <label>Base Level
-            <input id="colBaseLevel" autocomplete="off" placeholder="Level 1" required />
-          </label>
-          <label>Top Level
-            <input id="colTopLevel" autocomplete="off" placeholder="Level 2" required />
-          </label>
-        </div>
-        <label>Notes
-          <textarea id="colNotes" rows="4" placeholder="Optional connection or erection notes"></textarea>
-        </label>
-        <div class="form-actions">
-          <button id="saveColumnBtn" type="submit">Save Column</button>
-          <button id="deleteColumnBtn" type="button" class="secondary hidden">Delete</button>
-        </div>
-      </form>
+      <div id="propertiesPanel" class="panel-empty">No element selected</div>
     </aside>
 
-    <section class="bottom-data-preview" aria-label="Column data preview">
+    <section class="bottom-data-preview" aria-label="Structural data table">
       <div class="table-head">
         <div>
-          <h2>Column Data Preview</h2>
-          <p>All placed columns are collected here for the combined export table.</p>
+          <h2>Data Table</h2>
+          <p>Clean structural input data for spreadsheet export.</p>
+        </div>
+        <div class="table-tabs" role="tablist" aria-label="Element filters">
+          <button type="button" data-filter="all" class="active">All</button>
+          <button type="button" data-filter="column">Columns</button>
+          <button type="button" data-filter="beam">Beams</button>
+          <button type="button" data-filter="brb">BRBs</button>
+          <button type="button" data-filter="gusset">Gussets</button>
         </div>
       </div>
       <div class="table-scroll">
@@ -106,16 +97,16 @@
           <thead>
             <tr>
               <th>ID</th>
-              <th>Grid Location</th>
+              <th>Type</th>
               <th>Mark</th>
-              <th>Size</th>
-              <th>Base Level</th>
-              <th>Top Level</th>
+              <th>Location</th>
+              <th>Size / Core Area</th>
+              <th>Level</th>
               <th>Notes</th>
             </tr>
           </thead>
           <tbody id="dataTableBody">
-            <tr><td colspan="7" class="empty-row">No columns created.</td></tr>
+            <tr><td colspan="7" class="empty-row">No elements created.</td></tr>
           </tbody>
         </table>
       </div>
@@ -125,7 +116,7 @@
   <dialog id="projectModal">
     <form id="projectForm" method="dialog" class="modal-form">
       <h2>Project Setup</h2>
-      <p>Define the grid labels used to place structural elements.</p>
+      <p>Create the structural grid and project levels.</p>
       <label>Project name
         <input id="projectName" type="text" value="BRB Frame Layout" required />
       </label>
@@ -135,8 +126,10 @@
       <label>Y grid labels
         <input id="yLabels" type="text" value="1,2,3,4" placeholder="1,2,3,4" required />
       </label>
+      <label>Levels
+        <input id="levels" type="text" value="Level 1,Level 2,Roof" placeholder="Level 1,Level 2,Roof" required />
+      </label>
       <div class="modal-actions">
-        <button id="cancelProjectBtn" type="button" class="secondary">Cancel</button>
         <button type="submit">Create Grid</button>
       </div>
     </form>
