@@ -1,18 +1,23 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const GRID_SPACING = 150;
-const GRID_MARGIN_X = 92;
-const GRID_MARGIN_Y = 86;
-const MEMBER_OFFSET = 12;
+const BAY_SPACING = 230;
+const STORY_HEIGHT = 185;
+const SHEET_PAD_X = 150;
+const SHEET_PAD_TOP = 120;
+const SHEET_PAD_BOTTOM = 155;
+const SNAP_DISTANCE = 36;
 
 const state = {
   project: null,
   gridPoints: [],
   elements: [],
   placementMode: 'select',
+  detailStyle: 'detail',
   pendingStartPointId: null,
   selectedElementId: null,
   tableFilter: 'all',
   drag: null,
+  pointerSvgPoint: null,
+  snapPointId: null,
 };
 
 const els = {
@@ -29,6 +34,7 @@ const els = {
   yLabelsValue: document.getElementById('yLabelsValue'),
   levelsValue: document.getElementById('levelsValue'),
   projectSetupBtn: document.getElementById('projectSetupBtn'),
+  detailStyleBtn: document.getElementById('detailStyleBtn'),
   deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
   exportCsvBtn: document.getElementById('exportCsvBtn'),
 };
@@ -56,6 +62,10 @@ function gridPointId(xLabel, yLabel) {
   return `${xLabel}-${yLabel}`;
 }
 
+function verticalLabels() {
+  return state.project?.yGridLabels?.length ? state.project.yGridLabels : projectLevels().slice().reverse();
+}
+
 function generateGridPoints(xGridLabels, yGridLabels) {
   const points = [];
   yGridLabels.forEach((yLabel, yIndex) => {
@@ -64,30 +74,83 @@ function generateGridPoints(xGridLabels, yGridLabels) {
         id: gridPointId(xLabel, yLabel),
         xLabel,
         yLabel,
-        x: GRID_MARGIN_X + xIndex * GRID_SPACING,
-        y: GRID_MARGIN_Y + yIndex * GRID_SPACING,
+        x: SHEET_PAD_X + xIndex * BAY_SPACING,
+        y: SHEET_PAD_TOP + yIndex * STORY_HEIGHT,
       });
     });
   });
   return points;
 }
 
-function getPoint(id) {
-  return state.gridPoints.find(point => point.id === id);
+function getPointById(pointId) {
+  return state.gridPoints.find(point => point.id === pointId);
 }
 
 function getPointByLabels(xLabel, yLabel) {
   return state.gridPoints.find(point => point.xLabel === xLabel && point.yLabel === yLabel);
 }
 
-function verticalLabels() {
-  return state.project?.yGridLabels?.length ? state.project.yGridLabels : projectLevels().slice().reverse();
+function projectLevels() {
+  return state.project?.levels?.length ? state.project.levels : ['Level 1'];
+}
+
+function defaultLevel(preferRoof = false) {
+  const levels = projectLevels();
+  if (preferRoof) return levels.find(level => level.toLowerCase() === 'roof') || levels[levels.length - 1] || levels[0];
+  return levels[0];
+}
+
+function lastLevel() {
+  const levels = projectLevels();
+  return levels[levels.length - 1] || levels[0];
 }
 
 function pointForColumnLevel(element, level) {
-  const anchor = getPoint(element.gridPointId);
+  const anchor = getPointById(element.gridPointId);
   if (!anchor) return null;
   return getPointByLabels(anchor.xLabel, level) || anchor;
+}
+
+function getElementStartEnd(element) {
+  if (element.type === 'column') return [pointForColumnLevel(element, element.baseLevel), pointForColumnLevel(element, element.topLevel)];
+  if (element.type === 'beam' || element.type === 'brb') return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
+  const point = getPointById(element.attachedGridPointId);
+  return [point, point];
+}
+
+function getMidpoint(p1, p2) {
+  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+}
+
+function getAngle(p1, p2) {
+  return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+}
+
+function getOffsetPoint(point, angle, offset) {
+  return { x: point.x + Math.cos(angle) * offset, y: point.y + Math.sin(angle) * offset };
+}
+
+function getNormalOffset(p1, p2, offset) {
+  const angle = getAngle(p1, p2) + Math.PI / 2;
+  return { x: Math.cos(angle) * offset, y: Math.sin(angle) * offset };
+}
+
+function distanceToPoint(p1, p2) {
+  return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+}
+
+function findNearestGridPoint(svgPoint, maxDistance = Infinity) {
+  if (!state.gridPoints.length || !svgPoint) return null;
+  let nearest = null;
+  let bestDistance = Infinity;
+  state.gridPoints.forEach(point => {
+    const distance = distanceToPoint(point, svgPoint);
+    if (distance < bestDistance) {
+      nearest = point;
+      bestDistance = distance;
+    }
+  });
+  return bestDistance <= maxDistance ? nearest : null;
 }
 
 function selectedElement() {
@@ -102,6 +165,11 @@ function createSvg(tag, attrs = {}) {
   return element;
 }
 
+function append(parent, ...children) {
+  children.forEach(child => child && parent.appendChild(child));
+  return parent;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -111,21 +179,23 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function projectLevels() {
-  return state.project?.levels?.length ? state.project.levels : ['Level 1'];
+function drawingExtents() {
+  const xLabels = state.project?.xGridLabels || ['A'];
+  const yLabels = verticalLabels();
+  const minX = SHEET_PAD_X;
+  const minY = SHEET_PAD_TOP;
+  const maxX = SHEET_PAD_X + (xLabels.length - 1) * BAY_SPACING;
+  const maxY = SHEET_PAD_TOP + (yLabels.length - 1) * STORY_HEIGHT;
+  return { minX, minY, maxX, maxY, xLabels, yLabels };
 }
 
-function defaultLevel(preferRoof = false) {
-  const levels = projectLevels();
-  if (preferRoof) {
-    return levels.find(level => level.toLowerCase() === 'roof') || levels[0];
-  }
-  return levels[0];
-}
-
-function lastLevel() {
-  const levels = projectLevels();
-  return levels[levels.length - 1] || levels[0];
+function canvasSize() {
+  if (!state.project) return { width: 1120, height: 720 };
+  const { maxX, maxY } = drawingExtents();
+  return {
+    width: Math.max(1120, maxX + SHEET_PAD_X + 145),
+    height: Math.max(720, maxY + SHEET_PAD_BOTTOM),
+  };
 }
 
 function setPlacementMode(mode) {
@@ -135,9 +205,8 @@ function setPlacementMode(mode) {
   }
   state.placementMode = mode;
   state.pendingStartPointId = null;
-  document.querySelectorAll('[data-tool]').forEach(button => {
-    button.classList.toggle('active', button.dataset.tool === mode);
-  });
+  state.pointerSvgPoint = null;
+  state.snapPointId = null;
   render();
 }
 
@@ -148,8 +217,7 @@ function setSelectedElement(id) {
 
 function openProjectSetup() {
   els.modal.classList.add('is-open');
-  const projectNameInput = document.getElementById('projectName');
-  if (projectNameInput) projectNameInput.focus();
+  document.getElementById('projectName')?.focus();
 }
 
 function closeProjectSetup() {
@@ -158,19 +226,87 @@ function closeProjectSetup() {
 
 function updateProjectInfo() {
   if (!state.project) return;
-  els.projectMeta.textContent = `${state.project.name} - frame elevation`;
+  els.projectMeta.textContent = `${state.project.name} - ${state.detailStyle === 'detail' ? 'detail' : 'simple'} frame elevation`;
   els.projectNameValue.textContent = state.project.name;
   els.xLabelsValue.textContent = state.project.xGridLabels.join(', ');
-  els.yLabelsValue.textContent = state.project.yGridLabels.join(', ');
+  els.yLabelsValue.textContent = verticalLabels().join(', ');
   els.levelsValue.textContent = state.project.levels.join(', ');
 }
 
-function canvasSize() {
-  if (!state.project) return { width: 720, height: 500 };
-  return {
-    width: GRID_MARGIN_X * 2 + Math.max(1, state.project.xGridLabels.length - 1) * GRID_SPACING + 90,
-    height: GRID_MARGIN_Y * 2 + Math.max(1, verticalLabels().length - 1) * GRID_SPACING + 40,
-  };
+function labelTag(x, y, text, anchor = 'start', className = 'label-tag') {
+  const paddingX = 5;
+  const width = Math.max(28, String(text).length * 7.1 + paddingX * 2);
+  const height = 18;
+  const left = anchor === 'middle' ? x - width / 2 : anchor === 'end' ? x - width : x;
+  const group = createSvg('g', { class: className });
+  append(group, createSvg('rect', { x: left, y: y - 13, width, height }), createSvg('text', { x: left + paddingX, y: y, class: 'element-label' }));
+  group.lastChild.textContent = text;
+  return group;
+}
+
+function BoltPattern(point, angle, count = 4, spacing = 11) {
+  const group = createSvg('g', { class: 'bolt-pattern' });
+  const axis = angle + Math.PI / 2;
+  for (let index = 0; index < count; index += 1) {
+    const offset = index - (count - 1) / 2;
+    append(group, createSvg('circle', { cx: point.x + Math.cos(axis) * spacing * offset, cy: point.y + Math.sin(axis) * spacing * offset, r: 3, class: 'bolt' }));
+  }
+  return group;
+}
+
+function Centerline(p1, p2, className = 'brb-centerline') {
+  return createSvg('line', { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: className });
+}
+
+function rotatedRect(start, end, width, className) {
+  const length = distanceToPoint(start, end);
+  if (!length) return null;
+  const nx = -(end.y - start.y) / length;
+  const ny = (end.x - start.x) / length;
+  const half = width / 2;
+  const points = [
+    `${start.x + nx * half},${start.y + ny * half}`,
+    `${end.x + nx * half},${end.y + ny * half}`,
+    `${end.x - nx * half},${end.y - ny * half}`,
+    `${start.x - nx * half},${start.y - ny * half}`,
+  ].join(' ');
+  return createSvg('polygon', { points, class: className });
+}
+
+function DimensionLine(start, end, label, side = 'bottom') {
+  const group = createSvg('g', { class: 'dimension' });
+  const isVertical = side === 'right';
+  append(group, createSvg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: 'dimension-line' }));
+  if (isVertical) {
+    append(group, createSvg('path', { d: `M ${start.x} ${start.y} l -4 9 l 8 0 Z M ${end.x} ${end.y} l -4 -9 l 8 0 Z`, class: 'dimension-arrow' }), labelTag(start.x + 16, (start.y + end.y) / 2, label, 'middle'));
+  } else {
+    append(group, createSvg('path', { d: `M ${start.x} ${start.y} l 9 -4 l 0 8 Z M ${end.x} ${end.y} l -9 -4 l 0 8 Z`, class: 'dimension-arrow' }), labelTag((start.x + end.x) / 2, start.y + 20, label, 'middle'));
+  }
+  return group;
+}
+
+function SelectionHandles(element) {
+  const [start, end] = getElementStartEnd(element);
+  if (!start) return null;
+  const group = createSvg('g', { class: 'selection-handles' });
+  const points = element.type === 'column' ? [getMidpoint(start, end)] : element.type === 'gusset' ? [start] : [start, end];
+  points.forEach(point => append(group, createSvg('circle', { cx: point.x, cy: point.y, r: 7, class: 'selection-grip' })));
+  append(group, labelTag(points[0].x + 12, points[0].y - 14, `${element.mark} selected`, 'start', 'selection-tag'));
+  return group;
+}
+
+function selectionOutlineFor(element) {
+  const [start, end] = getElementStartEnd(element);
+  if (!start) return null;
+  if (element.type === 'column') {
+    const y1 = Math.min(start.y, end.y) - 18;
+    const y2 = Math.max(start.y, end.y) + 18;
+    return createSvg('rect', { x: start.x - 28, y: y1, width: 56, height: y2 - y1, class: 'selection-outline' });
+  }
+  if (element.type === 'gusset') return createSvg('circle', { cx: start.x, cy: start.y, r: 56, class: 'selection-outline' });
+  const normal = getNormalOffset(start, end, 24);
+  const points = [`${start.x + normal.x},${start.y + normal.y}`, `${end.x + normal.x},${end.y + normal.y}`, `${end.x - normal.x},${end.y - normal.y}`, `${start.x - normal.x},${start.y - normal.y}`].join(' ');
+  return createSvg('polygon', { points, class: 'selection-outline' });
 }
 
 function renderCanvas() {
@@ -181,56 +317,80 @@ function renderCanvas() {
   svg.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);
   svg.setAttribute('width', size.width);
   svg.setAttribute('height', size.height);
-
   if (!state.project) return;
+  const { minX, minY, maxX, maxY } = drawingExtents();
+  append(svg, createSvg('rect', { x: 24, y: 24, width: size.width - 48, height: size.height - 48, class: 'drawing-sheet' }));
+  renderGrid(svg, minX, minY, maxX, maxY);
+  renderDimensions(svg, minX, minY, maxX, maxY);
+  state.elements.filter(element => element.type === 'beam').forEach(element => svg.appendChild(BeamSymbol(element)));
+  state.elements.filter(element => element.type === 'brb').forEach(element => svg.appendChild(BRBSymbol(element)));
+  state.elements.filter(element => element.type === 'column').forEach(element => svg.appendChild(ColumnSymbol(element)));
+  state.elements.filter(element => element.type === 'gusset').forEach(element => svg.appendChild(GussetPlateSymbol(element)));
+  renderSelection(svg);
+  renderGridPoints(svg);
+  renderPlacementPreview(svg);
+}
 
-  const xLabels = state.project.xGridLabels;
-  const yLabels = verticalLabels();
-  const minX = GRID_MARGIN_X;
-  const minY = GRID_MARGIN_Y;
-  const maxX = GRID_MARGIN_X + (xLabels.length - 1) * GRID_SPACING;
-  const maxY = GRID_MARGIN_Y + (yLabels.length - 1) * GRID_SPACING;
-
-  xLabels.forEach((label, index) => {
-    const x = GRID_MARGIN_X + index * GRID_SPACING;
-    svg.appendChild(createSvg('line', { x1: x, y1: minY, x2: x, y2: maxY, class: 'grid-line' }));
-    const text = createSvg('text', { x, y: 42, class: 'grid-label', 'text-anchor': 'middle' });
-    text.textContent = label;
-    svg.appendChild(text);
+function renderGrid(svg, minX, minY, maxX, maxY) {
+  verticalLabels().forEach((label, index) => {
+    const y = SHEET_PAD_TOP + index * STORY_HEIGHT;
+    append(svg, createSvg('line', { x1: minX - 42, y1: y, x2: maxX + 42, y2: y, class: 'grid-line' }));
+    append(svg, labelTag(minX - 112, y + 4, label, 'start'));
   });
-
-  yLabels.forEach((label, index) => {
-    const y = GRID_MARGIN_Y + index * GRID_SPACING;
-    svg.appendChild(createSvg('line', { x1: minX, y1: y, x2: maxX, y2: y, class: 'grid-line' }));
-    const text = createSvg('text', { x: 50, y: y + 5, class: 'grid-label', 'text-anchor': 'middle' });
-    text.textContent = label;
-    svg.appendChild(text);
+  state.project.xGridLabels.forEach((label, index) => {
+    const x = SHEET_PAD_X + index * BAY_SPACING;
+    append(svg, createSvg('line', { x1: x, y1: minY - 42, x2: x, y2: maxY + 42, class: 'grid-line' }));
+    append(svg, createSvg('circle', { cx: x, cy: minY - 70, r: 17, class: 'grid-bubble' }));
+    const topText = createSvg('text', { x, y: minY - 65, class: 'grid-label', 'text-anchor': 'middle' });
+    topText.textContent = label;
+    append(svg, topText, createSvg('circle', { cx: x, cy: maxY + 70, r: 17, class: 'grid-bubble' }));
+    const bottomText = createSvg('text', { x, y: maxY + 75, class: 'grid-label', 'text-anchor': 'middle' });
+    bottomText.textContent = label;
+    append(svg, bottomText);
   });
+  append(svg, createSvg('line', { x1: 52, y1: maxY + 104, x2: maxX + 116, y2: maxY + 104, class: 'sheet-title-line' }));
+}
 
-  renderElevationDimensions(svg, minX, minY, maxX, maxY);
+function renderDimensions(svg, minX, minY, maxX, maxY) {
+  const bottomY = maxY + 116;
+  const rightX = maxX + 86;
+  append(svg, createSvg('line', { x1: minX, y1: maxY + 24, x2: minX, y2: bottomY + 10, class: 'extension-line' }), createSvg('line', { x1: maxX, y1: maxY + 24, x2: maxX, y2: bottomY + 10, class: 'extension-line' }), DimensionLine({ x: minX, y: bottomY }, { x: maxX, y: bottomY }, 'Frame Width'), createSvg('line', { x1: maxX + 24, y1: minY, x2: rightX + 10, y2: minY, class: 'extension-line' }), createSvg('line', { x1: maxX + 24, y1: maxY, x2: rightX + 10, y2: maxY, class: 'extension-line' }), DimensionLine({ x: rightX, y: minY }, { x: rightX, y: maxY }, 'Frame Height', 'right'));
+}
 
-  state.elements.forEach(element => {
-    if (element.type === 'beam') renderBeam(svg, element);
-    if (element.type === 'brb') renderBrb(svg, element);
-    if (element.type === 'column') renderColumn(svg, element);
-    if (element.type === 'gusset') renderGusset(svg, element);
-  });
-
+function renderGridPoints(svg) {
   state.gridPoints.forEach(point => {
-    const circle = createSvg('circle', {
-      cx: point.x,
-      cy: point.y,
-      r: state.pendingStartPointId === point.id ? 8 : 5,
-      class: `grid-point${state.pendingStartPointId === point.id ? ' pending' : ''}`,
-      'data-point-id': point.id,
-    });
+    const isPending = state.pendingStartPointId === point.id;
+    const isSnap = state.snapPointId === point.id;
+    if (isSnap) append(svg, createSvg('circle', { cx: point.x, cy: point.y, r: 16, class: 'snap-halo' }));
+    const circle = createSvg('circle', { cx: point.x, cy: point.y, r: isPending ? 8 : 4.5, class: `grid-point${isPending ? ' pending' : ''}`, 'data-point-id': point.id });
     circle.addEventListener('click', event => {
       event.stopPropagation();
       handleGridPointClick(point.id);
     });
-    svg.appendChild(circle);
+    append(svg, circle);
   });
+}
 
+function renderSelection(svg) {
+  const element = selectedElement();
+  if (!element) return;
+  append(svg, selectionOutlineFor(element), SelectionHandles(element));
+}
+
+function renderPlacementPreview(svg) {
+  if (!state.pendingStartPointId || !['beam', 'brb'].includes(state.placementMode)) return;
+  const start = getPointById(state.pendingStartPointId);
+  if (!start) return;
+  const end = state.snapPointId ? getPointById(state.snapPointId) : state.pointerSvgPoint;
+  if (!end) return;
+  append(svg, createSvg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: 'placement-preview' }));
+  const text = `Select end point for ${state.placementMode === 'beam' ? 'Beam' : 'BRB'}`;
+  const group = createSvg('g', { class: 'instruction-banner' });
+  append(group, createSvg('rect', { x: start.x + 18, y: start.y - 42, width: 188, height: 26 }));
+  const label = createSvg('text', { x: start.x + 28, y: start.y - 24 });
+  label.textContent = text;
+  append(group, label);
+  append(svg, group);
 }
 
 function elementClass(element) {
@@ -240,196 +400,132 @@ function elementClass(element) {
 function attachElementEvents(node, element) {
   node.addEventListener('click', event => {
     event.stopPropagation();
+    if (state.placementMode === 'gusset' && element.type === 'brb') {
+      const point = nearestBrbEndpoint(element, eventToSvgPoint(event));
+      if (point) createGusset(point.id, element.id);
+      return render();
+    }
     setSelectedElement(element.id);
     state.placementMode = 'select';
     state.pendingStartPointId = null;
   });
 }
 
-function appendMemberLine(group, x1, y1, x2, y2, className) {
-  group.appendChild(createSvg('line', { x1, y1, x2, y2, class: className }));
-}
-
-function appendRotatedRect(group, start, end, width, attrs) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const length = Math.hypot(dx, dy);
-  if (!length) return;
-  const nx = -dy / length;
-  const ny = dx / length;
-  const half = width / 2;
-  const points = [
-    `${start.x + nx * half},${start.y + ny * half}`,
-    `${end.x + nx * half},${end.y + ny * half}`,
-    `${end.x - nx * half},${end.y - ny * half}`,
-    `${start.x - nx * half},${start.y - ny * half}`,
-  ].join(' ');
-  group.appendChild(createSvg('polygon', { points, ...attrs }));
-}
-
-function renderBoltGroup(group, point, angle, count = 4) {
-  const spacing = 10;
-  const dx = Math.cos(angle) * spacing;
-  const dy = Math.sin(angle) * spacing;
-  for (let index = 0; index < count; index += 1) {
-    const offset = index - (count - 1) / 2;
-    group.appendChild(createSvg('circle', {
-      cx: point.x + dx * offset,
-      cy: point.y + dy * offset,
-      r: 2.5,
-      class: 'bolt',
-    }));
-  }
-}
-
-function appendGussetAtJoint(group, joint, ux, uy, length, depth) {
-  const nx = -uy;
-  const ny = ux;
-  const points = [
-    `${joint.x},${joint.y}`,
-    `${joint.x + ux * length + nx * depth},${joint.y + uy * length + ny * depth}`,
-    `${joint.x + ux * length - nx * depth},${joint.y + uy * length - ny * depth}`,
-  ].join(' ');
-  group.appendChild(createSvg('polygon', { points, class: 'gusset-sketch' }));
-}
-
-function renderElevationDimensions(svg, minX, minY, maxX, maxY) {
-  const bottomY = maxY + 38;
-  const rightX = maxX + 60;
-  svg.appendChild(createSvg('line', { x1: minX, y1: bottomY, x2: maxX, y2: bottomY, class: 'dimension-line' }));
-  svg.appendChild(createSvg('line', { x1: minX, y1: maxY + 12, x2: minX, y2: bottomY + 10, class: 'extension-line' }));
-  svg.appendChild(createSvg('line', { x1: maxX, y1: maxY + 12, x2: maxX, y2: bottomY + 10, class: 'extension-line' }));
-  svg.appendChild(createSvg('path', { d: `M ${minX} ${bottomY} l 9 -4 l 0 8 Z M ${maxX} ${bottomY} l -9 -4 l 0 8 Z`, class: 'dimension-arrow' }));
-  const widthLabel = createSvg('text', { x: (minX + maxX) / 2, y: bottomY + 19, class: 'dimension-label', 'text-anchor': 'middle' });
-  widthLabel.textContent = 'Wwp';
-  svg.appendChild(widthLabel);
-
-  svg.appendChild(createSvg('line', { x1: rightX, y1: minY, x2: rightX, y2: maxY, class: 'dimension-line' }));
-  svg.appendChild(createSvg('line', { x1: maxX + 12, y1: minY, x2: rightX + 10, y2: minY, class: 'extension-line' }));
-  svg.appendChild(createSvg('line', { x1: maxX + 12, y1: maxY, x2: rightX + 10, y2: maxY, class: 'extension-line' }));
-  svg.appendChild(createSvg('path', { d: `M ${rightX} ${minY} l -4 9 l 8 0 Z M ${rightX} ${maxY} l -4 -9 l 8 0 Z`, class: 'dimension-arrow' }));
-  const heightLabel = createSvg('text', { x: rightX + 19, y: (minY + maxY) / 2, class: 'dimension-label vertical-label', 'text-anchor': 'middle' });
-  heightLabel.textContent = 'Hwp';
-  svg.appendChild(heightLabel);
-}
-
-function renderColumn(svg, element) {
-  const base = pointForColumnLevel(element, element.baseLevel);
-  const top = pointForColumnLevel(element, element.topLevel);
-  if (!base || !top) return;
+function ColumnSymbol(element) {
+  const [base, top] = getElementStartEnd(element);
+  const group = createSvg('g', { class: `element column-element${elementClass(element)}`, 'data-id': element.id });
+  if (!base || !top) return group;
   const x = base.x;
   const y1 = Math.min(base.y, top.y);
   const y2 = Math.max(base.y, top.y);
-  const group = createSvg('g', { class: `element column-element${elementClass(element)}`, 'data-id': element.id });
-  const web = createSvg('rect', { x: x - 5, y: y1, width: 10, height: y2 - y1, class: 'column-web' });
-  const leftFlange = createSvg('rect', { x: x - 18, y: y1 - 12, width: 6, height: y2 - y1 + 24, class: 'column-flange' });
-  const rightFlange = createSvg('rect', { x: x + 12, y: y1 - 12, width: 6, height: y2 - y1 + 24, class: 'column-flange' });
-  group.append(web, leftFlange, rightFlange);
-  const label = createSvg('text', { x: x + 24, y: y1 + 18, class: 'element-label' });
-  label.textContent = element.mark;
-  group.appendChild(label);
+  if (state.detailStyle === 'simple') {
+    append(group, createSvg('rect', { x: x - 7, y: y1, width: 14, height: y2 - y1, class: 'column-web' }));
+  } else {
+    append(group, createSvg('rect', { x: x - 5, y: y1, width: 10, height: y2 - y1, class: 'column-web' }), createSvg('rect', { x: x - 22, y: y1 - 10, width: 7, height: y2 - y1 + 20, class: 'column-flange' }), createSvg('rect', { x: x + 15, y: y1 - 10, width: 7, height: y2 - y1 + 20, class: 'column-flange' }), createSvg('rect', { x: x - 27, y: y2 + 4, width: 54, height: 7, class: 'column-cap' }));
+  }
+  append(group, labelTag(x + 28, y1 + 20, element.mark));
   group.addEventListener('pointerdown', event => beginColumnDrag(event, element.id));
   attachElementEvents(group, element);
-  svg.appendChild(group);
+  return group;
 }
 
-function renderBeam(svg, element) {
-  const start = getPoint(element.startGridPointId);
-  const end = getPoint(element.endGridPointId);
-  if (!start || !end) return;
+function BeamSymbol(element) {
+  const [start, end] = getElementStartEnd(element);
   const group = createSvg('g', { class: `element beam-element${elementClass(element)}`, 'data-id': element.id });
+  if (!start || !end) return group;
   const y = start.y;
-  appendMemberLine(group, start.x, y - MEMBER_OFFSET, end.x, y - MEMBER_OFFSET, 'beam-flange');
-  appendMemberLine(group, start.x, y + MEMBER_OFFSET, end.x, y + MEMBER_OFFSET, 'beam-flange');
-  group.appendChild(createSvg('line', { x1: start.x, y1: y, x2: end.x, y2: y, class: 'beam-web' }));
-  const label = createSvg('text', {
-    x: (start.x + end.x) / 2,
-    y: y - 22,
-    class: 'element-label',
-    'text-anchor': 'middle',
-  });
-  label.textContent = element.mark;
-  group.appendChild(label);
+  if (state.detailStyle === 'simple') {
+    append(group, createSvg('line', { x1: start.x, y1: y, x2: end.x, y2: y, class: 'beam-flange' }));
+  } else {
+    append(group, createSvg('rect', { x: Math.min(start.x, end.x), y: y - 11, width: Math.abs(end.x - start.x), height: 22, class: 'beam-fill' }), createSvg('line', { x1: start.x, y1: y - 11, x2: end.x, y2: y - 11, class: 'beam-flange' }), createSvg('line', { x1: start.x, y1: y + 11, x2: end.x, y2: y + 11, class: 'beam-flange' }), createSvg('line', { x1: start.x, y1: y, x2: end.x, y2: y, class: 'beam-web' }));
+  }
+  append(group, labelTag((start.x + end.x) / 2, y - 24, element.mark, 'middle'));
   attachElementEvents(group, element);
-  svg.appendChild(group);
+  return group;
 }
 
-function renderBrb(svg, element) {
-  const start = getPoint(element.startGridPointId);
-  const end = getPoint(element.endGridPointId);
-  if (!start || !end) return;
+function BRBSymbol(element) {
+  const [start, end] = getElementStartEnd(element);
   const group = createSvg('g', { class: `element brb-element${elementClass(element)}`, 'data-id': element.id });
-  const angle = Math.atan2(end.y - start.y, end.x - start.x);
-  const inset = 42;
-  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  if (!start || !end) return group;
+  const length = distanceToPoint(start, end);
+  if (!length) return group;
+  const angle = getAngle(start, end);
   const ux = (end.x - start.x) / length;
   const uy = (end.y - start.y) / length;
-  const braceStart = { x: start.x + ux * inset, y: start.y + uy * inset };
-  const braceEnd = { x: end.x - ux * inset, y: end.y - uy * inset };
-  group.appendChild(createSvg('line', { x1: start.x - ux * 26, y1: start.y - uy * 26, x2: end.x + ux * 26, y2: end.y + uy * 26, class: 'brb-centerline' }));
-  appendRotatedRect(group, braceStart, braceEnd, 16, { class: 'brb-body' });
-  [start, end].forEach((point, index) => {
-    const dir = index === 0 ? 1 : -1;
-    const localUx = ux * dir;
-    const localUy = uy * dir;
-    const plateStart = { x: point.x + localUx * 22, y: point.y + localUy * 22 };
-    const plateEnd = { x: point.x + localUx * 78, y: point.y + localUy * 78 };
-    appendGussetAtJoint(group, point, localUx, localUy, 76, 34);
-    appendRotatedRect(group, plateStart, plateEnd, 20, { class: 'connection-plate' });
-    group.appendChild(createSvg('line', { x1: point.x, y1: point.y, x2: plateEnd.x, y2: plateEnd.y, class: 'brb-pin-line' }));
-    renderBoltGroup(group, { x: point.x + localUx * 45, y: point.y + localUy * 45 }, angle, 4);
-  });
-  const label = createSvg('text', {
-    x: (start.x + end.x) / 2,
-    y: (start.y + end.y) / 2 - 10,
-    class: 'brb-label',
-    'text-anchor': 'middle',
-  });
-  label.textContent = element.mark;
-  group.appendChild(label);
+  const centerStart = { x: start.x - ux * 24, y: start.y - uy * 24 };
+  const centerEnd = { x: end.x + ux * 24, y: end.y + uy * 24 };
+  const bodyStart = getOffsetPoint(start, angle, state.detailStyle === 'detail' ? 72 : 20);
+  const bodyEnd = getOffsetPoint(end, angle + Math.PI, state.detailStyle === 'detail' ? 72 : 20);
+  append(group, Centerline(centerStart, centerEnd));
+  if (state.detailStyle === 'simple') {
+    append(group, rotatedRect(bodyStart, bodyEnd, 16, 'brb-body'));
+  } else {
+    append(group, rotatedRect(getOffsetPoint(start, angle, 24), getOffsetPoint(start, angle, 74), 13, 'brb-end-segment'), rotatedRect(bodyStart, bodyEnd, 22, 'brb-body'), rotatedRect(getOffsetPoint(end, angle + Math.PI, 24), getOffsetPoint(end, angle + Math.PI, 74), 13, 'brb-end-segment'));
+    renderBraceEndDetail(group, start, angle, 1);
+    renderBraceEndDetail(group, end, angle + Math.PI, -1);
+  }
+  const mid = getMidpoint(start, end);
+  const normal = getNormalOffset(start, end, -28);
+  append(group, labelTag(mid.x + normal.x, mid.y + normal.y, element.mark, 'middle'));
   attachElementEvents(group, element);
-  svg.appendChild(group);
+  return group;
 }
 
-function renderGusset(svg, element) {
-  const point = getPoint(element.attachedGridPointId);
-  if (!point) return;
+function renderBraceEndDetail(group, point, angle, side) {
+  const plateNear = getOffsetPoint(point, angle, 16);
+  const plateFar = getOffsetPoint(point, angle, 62);
+  append(group, gussetPolygon(point, angle, 72, 44, side), rotatedRect(plateNear, plateFar, 25, 'connection-plate'), Centerline(point, plateFar, 'brb-pin-line'), createSvg('circle', { cx: point.x, cy: point.y, r: 5, class: 'bolt' }), BoltPattern(getOffsetPoint(point, angle, 40), angle, 4, 9));
+}
+
+function gussetPolygon(point, angle, length = 62, depth = 42, side = 1) {
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const nx = -uy * side;
+  const ny = ux * side;
+  const points = [`${point.x},${point.y}`, `${point.x + ux * length + nx * depth},${point.y + uy * length + ny * depth}`, `${point.x + ux * length - nx * 8},${point.y + uy * length - ny * 8}`].join(' ');
+  return createSvg('polygon', { points, class: 'gusset-sketch' });
+}
+
+function GussetPlateSymbol(element) {
+  const point = getPointById(element.attachedGridPointId);
   const group = createSvg('g', { class: `element gusset-element${elementClass(element)}`, 'data-id': element.id });
-  group.appendChild(createSvg('polygon', {
-    points: `${point.x},${point.y} ${point.x + 58},${point.y} ${point.x},${point.y - 58}`,
-  }));
-  group.appendChild(createSvg('line', { x1: point.x + 9, y1: point.y - 9, x2: point.x + 49, y2: point.y - 49, class: 'brb-centerline' }));
-  renderBoltGroup(group, { x: point.x + 25, y: point.y - 20 }, -0.8, Number(element.boltQuantity) || 4);
-  const label = createSvg('text', { x: point.x + 12, y: point.y - 38, class: 'element-label' });
-  label.textContent = element.mark;
-  group.appendChild(label);
+  if (!point) return group;
+  const brb = state.elements.find(item => item.id === element.attachedToElementId && item.type === 'brb');
+  let angle = -Math.PI / 4;
+  let side = 1;
+  if (brb) {
+    const [start, end] = getElementStartEnd(brb);
+    if (start && end) {
+      angle = point.id === start.id ? getAngle(start, end) : getAngle(end, start);
+      side = point.id === start.id ? 1 : -1;
+    }
+  }
+  if (state.detailStyle === 'simple') {
+    append(group, gussetPolygon(point, angle, 54, 34, side));
+  } else {
+    append(group, gussetPolygon(point, angle, 72, 48, side), Centerline(point, getOffsetPoint(point, angle, 62)), BoltPattern(getOffsetPoint(point, angle, 35), angle, Number(element.boltQuantity) || 6, 9), createSvg('circle', { cx: point.x, cy: point.y, r: 4, class: 'bolt' }));
+  }
+  const labelPoint = getOffsetPoint(point, angle, 32);
+  append(group, labelTag(labelPoint.x + 10, labelPoint.y - 20, element.mark));
   attachElementEvents(group, element);
-  svg.appendChild(group);
+  return group;
 }
 
 function handleGridPointClick(pointId) {
+  if (state.placementMode === 'column') {
+    addColumnAtPoint(pointId);
+    return;
+  }
   if (state.placementMode === 'gusset') {
-    const element = {
-      id: nextElementId('gusset'),
-      type: 'gusset',
-      mark: nextMark('gusset'),
-      attachedGridPointId: pointId,
-      attachedToElementId: '',
-      thickness: '3/4"',
-      width: '18"',
-      height: '24"',
-      boltDiameter: '7/8"',
-      boltQuantity: 6,
-      notes: '',
-    };
-    state.elements.push(element);
-    state.selectedElementId = element.id;
+    const brbHit = nearestBrbEndpoint(null, getPointById(pointId), 18);
+    createGusset(pointId, brbHit?.elementId || '');
     return render();
   }
-
   if (state.placementMode === 'beam' || state.placementMode === 'brb') {
     if (!state.pendingStartPointId) {
       state.pendingStartPointId = pointId;
+      state.snapPointId = pointId;
       return render();
     }
     if (state.pendingStartPointId === pointId) return;
@@ -444,13 +540,17 @@ function handleGridPointClick(pointId) {
 function handleCanvasClick(event) {
   if (!state.project) return;
   if (event.target.closest?.('.element')) return;
-
+  const svgPoint = eventToSvgPoint(event);
+  if (state.placementMode === 'column') {
+    const nearest = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
+    if (nearest) addColumnAtPoint(nearest.id);
+    return;
+  }
   if (state.placementMode === 'beam' || state.placementMode === 'brb' || state.placementMode === 'gusset') {
-    const nearest = nearestGridPoint(eventToSvgPoint(event));
+    const nearest = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
     if (nearest) handleGridPointClick(nearest.id);
     return;
   }
-
   if (state.placementMode === 'select') setSelectedElement(null);
 }
 
@@ -459,22 +559,14 @@ function addColumn() {
     openProjectSetup();
     return;
   }
-  const bottomLevel = defaultLevel();
-  const xIndex = Math.floor((state.project?.xGridLabels.length || 1) / 2);
-  const xLabel = state.project?.xGridLabels[xIndex];
-  const point = getPointByLabels(xLabel, bottomLevel) || state.gridPoints[Math.floor(state.gridPoints.length / 2)] || state.gridPoints[0];
+  setPlacementMode('column');
+}
+
+function addColumnAtPoint(pointId) {
+  const point = getPointById(pointId);
   if (!point) return;
-  const element = {
-    id: nextElementId('column'),
-    type: 'column',
-    mark: nextMark('column'),
-    size: 'W14x45',
-    gridPointId: point.id,
-    baseLevel: defaultLevel(),
-    topLevel: lastLevel(),
-    orientation: 'strong-axis',
-    notes: '',
-  };
+  const base = getPointByLabels(point.xLabel, defaultLevel()) || point;
+  const element = { id: nextElementId('column'), type: 'column', mark: nextMark('column'), size: 'W14x45', gridPointId: base.id, baseLevel: defaultLevel(), topLevel: lastLevel(), orientation: 'strong-axis', notes: '' };
   state.elements.push(element);
   state.selectedElementId = element.id;
   state.placementMode = 'select';
@@ -482,36 +574,44 @@ function addColumn() {
 }
 
 function createBeam(startGridPointId, endGridPointId) {
-  const element = {
-    id: nextElementId('beam'),
-    type: 'beam',
-    mark: nextMark('beam'),
-    size: 'W24x131',
-    startGridPointId,
-    endGridPointId,
-    level: defaultLevel(true),
-    connectionType: 'Shear',
-    notes: '',
-  };
+  const start = getPointById(startGridPointId);
+  const end = getPointById(endGridPointId);
+  const element = { id: nextElementId('beam'), type: 'beam', mark: nextMark('beam'), size: 'W24x131', startGridPointId, endGridPointId, level: start?.yLabel || end?.yLabel || defaultLevel(true), connectionType: 'Shear', notes: '' };
   state.elements.push(element);
   state.selectedElementId = element.id;
 }
 
 function createBrb(startGridPointId, endGridPointId) {
-  const element = {
-    id: nextElementId('brb'),
-    type: 'brb',
-    mark: nextMark('brb'),
-    frameName: 'BRBF-1',
-    coreArea: '4.5 in2',
-    braceSize: '',
-    startGridPointId,
-    endGridPointId,
-    level: defaultLevel(),
-    notes: '',
-  };
+  const element = { id: nextElementId('brb'), type: 'brb', mark: nextMark('brb'), frameName: 'BRBF-1', coreArea: '4.5 in2', braceSize: '', startGridPointId, endGridPointId, level: defaultLevel(), notes: '' };
   state.elements.push(element);
   state.selectedElementId = element.id;
+}
+
+function createGusset(pointId, attachedToElementId = '') {
+  const element = { id: nextElementId('gusset'), type: 'gusset', mark: nextMark('gusset'), attachedGridPointId: pointId, attachedToElementId, thickness: '3/4"', width: '18"', height: '24"', boltDiameter: '7/8"', boltQuantity: 6, notes: '' };
+  state.elements.push(element);
+  state.selectedElementId = element.id;
+  state.placementMode = 'select';
+}
+
+function nearestBrbEndpoint(brbElement, svgPoint, maxDistance = SNAP_DISTANCE) {
+  const candidates = [];
+  const brbs = brbElement ? [brbElement] : state.elements.filter(element => element.type === 'brb');
+  brbs.forEach(brb => {
+    const [start, end] = getElementStartEnd(brb);
+    if (start) candidates.push({ point: start, elementId: brb.id });
+    if (end) candidates.push({ point: end, elementId: brb.id });
+  });
+  let best = null;
+  let bestDistance = Infinity;
+  candidates.forEach(candidate => {
+    const distance = distanceToPoint(candidate.point, svgPoint);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  });
+  return bestDistance <= maxDistance ? { ...best.point, elementId: best.elementId } : null;
 }
 
 function beginColumnDrag(event, elementId) {
@@ -523,19 +623,6 @@ function beginColumnDrag(event, elementId) {
   els.frameCanvas.setPointerCapture(event.pointerId);
 }
 
-function nearestGridPoint(svgPoint) {
-  let nearest = state.gridPoints[0];
-  let bestDistance = Infinity;
-  state.gridPoints.forEach(point => {
-    const distance = Math.hypot(point.x - svgPoint.x, point.y - svgPoint.y);
-    if (distance < bestDistance) {
-      nearest = point;
-      bestDistance = distance;
-    }
-  });
-  return nearest;
-}
-
 function eventToSvgPoint(event) {
   const point = els.frameCanvas.createSVGPoint();
   point.x = event.clientX;
@@ -544,12 +631,28 @@ function eventToSvgPoint(event) {
 }
 
 function handlePointerMove(event) {
-  if (!state.drag) return;
-  const element = state.elements.find(item => item.id === state.drag.elementId);
-  if (!element || element.type !== 'column') return;
-  const point = nearestGridPoint(eventToSvgPoint(event));
-  element.gridPointId = point.id;
-  render();
+  if (!state.project) return;
+  const svgPoint = eventToSvgPoint(event);
+  state.pointerSvgPoint = svgPoint;
+  const snap = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
+  state.snapPointId = snap?.id || null;
+  if (state.drag) {
+    const element = state.elements.find(item => item.id === state.drag.elementId);
+    if (element?.type === 'column') {
+      const point = findNearestGridPoint(svgPoint);
+      if (point) {
+        const base = getPointByLabels(point.xLabel, defaultLevel()) || point;
+        element.gridPointId = base.id;
+      }
+    }
+  }
+  if (state.drag || state.pendingStartPointId || state.placementMode === 'column') renderCanvas();
+}
+
+function handlePointerLeave() {
+  state.pointerSvgPoint = null;
+  state.snapPointId = null;
+  if (state.pendingStartPointId || state.placementMode === 'column') renderCanvas();
 }
 
 function handlePointerUp(event) {
@@ -566,13 +669,11 @@ function handlePointerUp(event) {
 function renderProperties() {
   const element = selectedElement();
   els.selectedBadge.textContent = element ? `${element.type.toUpperCase()} ${element.id}` : 'No element selected';
-
   if (!element) {
     els.propertiesPanel.className = 'panel-empty';
     els.propertiesPanel.textContent = 'No element selected';
     return;
   }
-
   els.propertiesPanel.className = 'property-form';
   els.propertiesPanel.innerHTML = propertiesTemplate(element);
   els.propertiesPanel.querySelectorAll('input, textarea, select').forEach(input => {
@@ -675,15 +776,11 @@ function levelFor(element) {
 }
 
 function renderTable() {
-  const filtered = state.tableFilter === 'all'
-    ? state.elements
-    : state.elements.filter(element => element.type === state.tableFilter);
-
+  const filtered = state.tableFilter === 'all' ? state.elements : state.elements.filter(element => element.type === state.tableFilter);
   if (!filtered.length) {
     els.dataTableBody.innerHTML = '<tr><td colspan="7" class="empty-row">No elements created.</td></tr>';
     return;
   }
-
   els.dataTableBody.innerHTML = filtered.map(element => `
     <tr data-id="${escapeHtml(element.id)}" class="${state.selectedElementId === element.id ? 'selected-row' : ''}">
       <td>${escapeHtml(element.id)}</td>
@@ -695,7 +792,6 @@ function renderTable() {
       <td>${escapeHtml(element.notes)}</td>
     </tr>
   `).join('');
-
   els.dataTableBody.querySelectorAll('tr[data-id]').forEach(row => {
     row.addEventListener('click', () => setSelectedElement(row.dataset.id));
   });
@@ -704,10 +800,10 @@ function renderTable() {
 function renderModeHint() {
   const mode = state.placementMode;
   if (mode === 'select') els.modeHint.textContent = 'Select an element to edit its properties.';
-  if (mode === 'column') els.modeHint.textContent = 'Add Column creates a draggable column that snaps to grid points.';
-  if (mode === 'beam') els.modeHint.textContent = state.pendingStartPointId ? `Beam start: ${state.pendingStartPointId}. Click an end grid point.` : 'Click the start grid point for the beam.';
-  if (mode === 'brb') els.modeHint.textContent = state.pendingStartPointId ? `BRB start: ${state.pendingStartPointId}. Click an end grid point.` : 'Click the start grid point for the BRB.';
-  if (mode === 'gusset') els.modeHint.textContent = 'Click a grid point to attach a gusset plate.';
+  if (mode === 'column') els.modeHint.textContent = 'Click a grid line or point to place a full-height column.';
+  if (mode === 'beam') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Beam.' : 'Click the start grid point for the beam.';
+  if (mode === 'brb') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for BRB.' : 'Click the start grid point for the BRB.';
+  if (mode === 'gusset') els.modeHint.textContent = 'Click a BRB endpoint or grid point to place a gusset plate.';
 }
 
 function render() {
@@ -722,6 +818,9 @@ function render() {
   document.querySelectorAll('[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === state.tableFilter);
   });
+  els.detailStyleBtn.classList.toggle('active', state.detailStyle === 'detail');
+  els.detailStyleBtn.setAttribute('aria-pressed', String(state.detailStyle === 'detail'));
+  els.detailStyleBtn.querySelector('span:last-child').textContent = state.detailStyle === 'detail' ? 'Detail' : 'Simple';
 }
 
 function deleteSelected() {
@@ -737,18 +836,8 @@ function exportCsv() {
     return;
   }
   const headers = ['id', 'type', 'mark', 'location', 'sizeOrCoreArea', 'level', 'notes'];
-  const rows = state.elements.map(element => [
-    element.id,
-    element.type,
-    element.mark,
-    locationFor(element),
-    sizeOrCoreArea(element),
-    levelFor(element),
-    element.notes,
-  ]);
-  const csv = [headers, ...rows]
-    .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n');
+  const rows = state.elements.map(element => [element.id, element.type, element.mark, locationFor(element), sizeOrCoreArea(element), levelFor(element), element.notes]);
+  const csv = [headers, ...rows].map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -761,25 +850,65 @@ function exportCsv() {
 }
 
 function createProject(event) {
-  event.preventDefault();
+  event?.preventDefault();
   const name = document.getElementById('projectName').value.trim();
   const xGridLabels = parseCsv(document.getElementById('xLabels').value);
   const levels = parseCsv(document.getElementById('levels').value);
+  setProject(name, xGridLabels, levels, true);
+  closeProjectSetup();
+  render();
+}
+
+function setProject(name, xGridLabels, levels, withStarterFrame = false) {
   const yGridLabels = levels.slice().reverse();
-  state.project = {
-    id: `PRJ-${Date.now()}`,
-    name,
-    xGridLabels,
-    yGridLabels,
-    levels,
-    createdAt: new Date().toISOString(),
-  };
+  state.project = { id: `PRJ-${Date.now()}`, name, xGridLabels, yGridLabels, levels, createdAt: new Date().toISOString() };
   state.gridPoints = generateGridPoints(xGridLabels, yGridLabels);
   state.elements = [];
   state.selectedElementId = null;
   state.pendingStartPointId = null;
   state.placementMode = 'select';
-  closeProjectSetup();
+  if (withStarterFrame) createStarterFrame();
+}
+
+function createStarterFrame() {
+  const p = (x, y) => getPointByLabels(x, y)?.id;
+  const col1 = p('B', 'Level 1');
+  const col2 = p('D', 'Level 1');
+  const roofA = p('A', 'Roof');
+  const roofB = p('B', 'Roof');
+  const roofC = p('C', 'Roof');
+  const roofD = p('D', 'Roof');
+  const level2B = p('B', 'Level 2');
+  const level2C = p('C', 'Level 2');
+  const level2D = p('D', 'Level 2');
+  if (col1) addStarterColumn(col1);
+  if (col2) addStarterColumn(col2);
+  if (roofA && roofB) addStarterBeam(roofA, roofB);
+  if (level2B && level2D) addStarterBeam(level2B, level2D);
+  if (level2B && roofC) addStarterBrb(level2B, roofC);
+  if (level2C && roofD) addStarterBrb(level2C, roofD);
+  state.elements.filter(element => element.type === 'brb').forEach(brb => {
+    createGusset(brb.startGridPointId, brb.id);
+    createGusset(brb.endGridPointId, brb.id);
+  });
+  state.selectedElementId = state.elements.find(element => element.type === 'brb')?.id || state.elements[0]?.id || null;
+  state.placementMode = 'select';
+}
+
+function addStarterColumn(gridPointId) {
+  state.elements.push({ id: nextElementId('column'), type: 'column', mark: nextMark('column'), size: 'W14x45', gridPointId, baseLevel: defaultLevel(), topLevel: lastLevel(), orientation: 'strong-axis', notes: '' });
+}
+
+function addStarterBeam(startGridPointId, endGridPointId) {
+  createBeam(startGridPointId, endGridPointId);
+}
+
+function addStarterBrb(startGridPointId, endGridPointId) {
+  createBrb(startGridPointId, endGridPointId);
+}
+
+function initializeDefaultProject() {
+  setProject('BRB Frame Layout', ['A', 'B', 'C', 'D'], ['Level 1', 'Level 2', 'Roof'], true);
   render();
 }
 
@@ -799,11 +928,15 @@ document.querySelectorAll('[data-filter]').forEach(button => {
 
 els.projectForm.addEventListener('submit', createProject);
 els.projectSetupBtn.addEventListener('click', openProjectSetup);
+els.detailStyleBtn.addEventListener('click', () => {
+  state.detailStyle = state.detailStyle === 'detail' ? 'simple' : 'detail';
+  render();
+});
 els.deleteSelectedBtn.addEventListener('click', deleteSelected);
 els.exportCsvBtn.addEventListener('click', exportCsv);
 els.frameCanvas.addEventListener('pointermove', handlePointerMove);
+els.frameCanvas.addEventListener('pointerleave', handlePointerLeave);
 els.frameCanvas.addEventListener('pointerup', handlePointerUp);
 els.frameCanvas.addEventListener('pointercancel', handlePointerUp);
 
-openProjectSetup();
-render();
+initializeDefaultProject();
