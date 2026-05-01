@@ -10,7 +10,7 @@
 
 body {
   margin: 0;
-  min-width: 1180px;
+  min-width: 1120px;
   background: #f3f5f7;
 }
 
@@ -44,8 +44,8 @@ button.active {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 270px minmax(620px, 1fr) 350px;
-  grid-template-rows: 68px minmax(410px, 1fr) 250px;
+  grid-template-columns: 230px minmax(720px, 1fr) 300px;
+  grid-template-rows: 64px minmax(520px, 1fr) 210px;
   grid-template-areas:
     "top top top"
     "left center right"
@@ -129,8 +129,8 @@ h2 {
   align-content: center;
   justify-items: center;
   gap: 2px;
-  min-width: 68px;
-  height: 58px;
+  min-width: 64px;
+  height: 54px;
   border-width: 0 0 0 1px;
   border-color: #e0e5eb;
   border-radius: 0;
@@ -190,7 +190,7 @@ h2 {
 .sidebar-section {
   display: grid;
   gap: 10px;
-  padding: 16px;
+  padding: 13px;
   border-bottom: 1px solid #e4e8ed;
 }
 
@@ -308,7 +308,7 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 13px 16px;
+  padding: 11px 16px;
   border-bottom: 1px solid #dbe1e7;
 }
 
@@ -326,32 +326,53 @@ h2 {
 .canvas-stage {
   flex: 1;
   overflow: auto;
-  padding: 20px;
-  background: #f5f7f9;
+  padding: 28px;
+  background:
+    linear-gradient(#edf1f5 1px, transparent 1px),
+    linear-gradient(90deg, #edf1f5 1px, transparent 1px),
+    #f7f8fa;
+  background-size: 24px 24px;
 }
 
 .frame-canvas {
   display: block;
-  min-width: 100%;
-  min-height: 100%;
-  border: 1px solid #d5dbe2;
-  background: #ffffff;
+  min-width: 1040px;
+  min-height: 620px;
+  background: transparent;
 }
 
 .grid-line {
-  stroke: #d4dae1;
-  stroke-width: 0.75;
+  stroke: #cfd6df;
+  stroke-width: 0.7;
 }
 
 .grid-label {
-  fill: #424b55;
+  fill: #2c3440;
   font-size: 13px;
   font-weight: 800;
 }
 
+.drawing-sheet {
+  fill: #ffffff;
+  stroke: #c7cdd6;
+  stroke-width: 1.1;
+  filter: drop-shadow(0 10px 18px rgba(31, 35, 40, 0.08));
+}
+
+.sheet-title-line {
+  stroke: #d8dee6;
+  stroke-width: 0.8;
+}
+
+.grid-bubble {
+  fill: #ffffff;
+  stroke: #6b7280;
+  stroke-width: 1.2;
+}
+
 .grid-point {
   fill: #ffffff;
-  stroke: #9aa5b1;
+  stroke: #a9b2bd;
   stroke-width: 1;
   cursor: pointer;
 }
@@ -371,7 +392,13 @@ h2 {
 .column-flange {
   fill: #ffffff;
   stroke: #111827;
-  stroke-width: 1.25;
+  stroke-width: 1.4;
+}
+
+.column-cap {
+  fill: #f8fafc;
+  stroke: #111827;
+  stroke-width: 1.2;
 }
 
 .beam-web,
@@ -387,6 +414,12 @@ h2 {
 }
 
 .beam-flange {
+  stroke-width: 1.55;
+}
+
+.beam-fill {
+  fill: #ffffff;
+  stroke: #111827;
   stroke-width: 1.35;
 }
 
@@ -397,9 +430,19 @@ h2 {
 
 .brb-body,
 .connection-plate {
-  fill: #ffffff;
+  fill: #b91c1c;
   stroke: #111827;
   stroke-width: 1.35;
+}
+
+.brb-end-segment {
+  fill: #f9fafb;
+  stroke: #111827;
+  stroke-width: 1.2;
+}
+
+.connection-plate {
+  fill: #e5e7eb;
 }
 
 .brb-centerline {
@@ -414,7 +457,7 @@ h2 {
 
 .gusset-sketch,
 .gusset-element polygon {
-  fill: rgba(255, 255, 255, 0.78);
+  fill: #f1f3f5;
   stroke: #111827;
   stroke-width: 1.2;
 }
@@ -425,30 +468,71 @@ h2 {
   stroke-width: 1;
 }
 
-.selected-element rect,
-.selected-element polygon,
-.selected-element .brb-body,
-.selected-element .gusset-sketch {
-  stroke: #ef2626;
+.selection-outline {
+  fill: none;
+  stroke: #f97316;
   stroke-width: 2;
+  stroke-dasharray: 8 5;
+  pointer-events: none;
 }
 
-.selected-element line {
-  filter: drop-shadow(0 0 0.25rem rgba(185, 28, 28, 0.8));
+.selected-element {
+  filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.55));
 }
 
 .element-label,
-.brb-label {
+.brb-label,
+.label-tag text,
+.selection-tag text {
   fill: #1f2328;
   font-size: 12px;
   font-weight: 800;
-  paint-order: stroke;
-  stroke: #ffffff;
-  stroke-width: 3px;
 }
 
-.brb-label {
+.label-tag rect,
+.selection-tag rect {
+  fill: #ffffff;
+  stroke: #d1d5db;
+  stroke-width: 0.8;
+  rx: 3;
+}
+
+.selection-tag rect {
+  fill: #fff7ed;
+  stroke: #f97316;
+}
+
+.selection-grip {
+  fill: #ffffff;
+  stroke: #f97316;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.placement-preview {
+  stroke: #f97316;
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+  pointer-events: none;
+}
+
+.snap-halo {
+  fill: rgba(249, 115, 22, 0.12);
+  stroke: #f97316;
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.instruction-banner rect {
   fill: #111827;
+  opacity: 0.92;
+  rx: 5;
+}
+
+.instruction-banner text {
+  fill: #ffffff;
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .dimension-line,
