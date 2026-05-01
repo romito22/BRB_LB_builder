@@ -29,3 +29,5 @@ button { cursor:pointer; padding:8px 10px; border-radius:4px; border:1px solid #
 .empty-state { font-size:13px; color:#6b7280; margin-bottom:10px; }
 table { width:100%; border-collapse:collapse; }
 th,td { border:1px solid #e5e7eb; padding:6px; text-align:left; font-size:13px; }
+
+.logo-fallback { background:#1d4ed8; color:#fff; font-weight:700; border-radius:4px; padding:8px 10px; display:inline-flex; align-items:center; }
