@@ -26,6 +26,7 @@ const els = {
   xLabelsValue: document.getElementById('xLabelsValue'),
   yLabelsValue: document.getElementById('yLabelsValue'),
   levelsValue: document.getElementById('levelsValue'),
+  projectSetupBtn: document.getElementById('projectSetupBtn'),
   deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
   exportCsvBtn: document.getElementById('exportCsvBtn'),
 };
@@ -86,7 +87,7 @@ function createSvg(tag, attrs = {}) {
 }
 
 function escapeHtml(value) {
-  return String(value ?? '')
+  return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -95,14 +96,12 @@ function escapeHtml(value) {
 }
 
 function projectLevels() {
-  return state.project?.levels?.length ? state.project.levels : ['Level 1'];
+  return state.project && state.project.levels && state.project.levels.length ? state.project.levels : ['Level 1'];
 }
 
 function defaultLevel(preferRoof = false) {
   const levels = projectLevels();
-  if (preferRoof) {
-    return levels.find(level => level.toLowerCase() === 'roof') || levels[0];
-  }
+  if (preferRoof) return levels.find(level => level.toLowerCase() === 'roof') || levels[0];
   return levels[0];
 }
 
@@ -111,12 +110,23 @@ function lastLevel() {
   return levels[levels.length - 1] || levels[0];
 }
 
+function openProjectSetup() {
+  els.modal.classList.add('is-open');
+  const projectNameInput = document.getElementById('projectName');
+  if (projectNameInput) projectNameInput.focus();
+}
+
+function closeProjectSetup() {
+  els.modal.classList.remove('is-open');
+}
+
 function setPlacementMode(mode) {
+  if (!state.project) {
+    openProjectSetup();
+    return;
+  }
   state.placementMode = mode;
   state.pendingStartPointId = null;
-  document.querySelectorAll('[data-tool]').forEach(button => {
-    button.classList.toggle('active', button.dataset.tool === mode);
-  });
   render();
 }
 
@@ -152,7 +162,6 @@ function renderCanvas() {
   svg.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);
   svg.setAttribute('width', size.width);
   svg.setAttribute('height', size.height);
-
   if (!state.project) return;
 
   const xLabels = state.project.xGridLabels;
@@ -218,10 +227,11 @@ function renderColumn(svg, element) {
   const point = getPoint(element.gridPointId);
   if (!point) return;
   const group = createSvg('g', { class: `element column-element${elementClass(element)}`, 'data-id': element.id });
-  const rect = createSvg('rect', { x: point.x - 12, y: point.y - 28, width: 24, height: 56, rx: 2 });
-  const flangeTop = createSvg('line', { x1: point.x - 20, y1: point.y - 28, x2: point.x + 20, y2: point.y - 28 });
-  const flangeBottom = createSvg('line', { x1: point.x - 20, y1: point.y + 28, x2: point.x + 20, y2: point.y + 28 });
-  group.append(rect, flangeTop, flangeBottom);
+  group.append(
+    createSvg('rect', { x: point.x - 12, y: point.y - 28, width: 24, height: 56, rx: 2 }),
+    createSvg('line', { x1: point.x - 20, y1: point.y - 28, x2: point.x + 20, y2: point.y - 28 }),
+    createSvg('line', { x1: point.x - 20, y1: point.y + 28, x2: point.x + 20, y2: point.y + 28 }),
+  );
   const label = createSvg('text', { x: point.x + 18, y: point.y - 32, class: 'element-label' });
   label.textContent = element.mark;
   group.appendChild(label);
@@ -236,12 +246,7 @@ function renderBeam(svg, element) {
   if (!start || !end) return;
   const group = createSvg('g', { class: `element beam-element${elementClass(element)}`, 'data-id': element.id });
   group.appendChild(createSvg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y }));
-  const label = createSvg('text', {
-    x: (start.x + end.x) / 2,
-    y: (start.y + end.y) / 2 - 10,
-    class: 'element-label',
-    'text-anchor': 'middle',
-  });
+  const label = createSvg('text', { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 10, class: 'element-label', 'text-anchor': 'middle' });
   label.textContent = element.mark;
   group.appendChild(label);
   attachElementEvents(group, element);
@@ -254,17 +259,14 @@ function renderBrb(svg, element) {
   if (!start || !end) return;
   const group = createSvg('g', { class: `element brb-element${elementClass(element)}`, 'data-id': element.id });
   group.appendChild(createSvg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: 'brb-outer' }));
-  const x1 = start.x + (end.x - start.x) * 0.28;
-  const y1 = start.y + (end.y - start.y) * 0.28;
-  const x2 = start.x + (end.x - start.x) * 0.72;
-  const y2 = start.y + (end.y - start.y) * 0.72;
-  group.appendChild(createSvg('line', { x1, y1, x2, y2, class: 'brb-core' }));
-  const label = createSvg('text', {
-    x: (start.x + end.x) / 2,
-    y: (start.y + end.y) / 2 - 10,
-    class: 'brb-label',
-    'text-anchor': 'middle',
-  });
+  group.appendChild(createSvg('line', {
+    x1: start.x + (end.x - start.x) * 0.28,
+    y1: start.y + (end.y - start.y) * 0.28,
+    x2: start.x + (end.x - start.x) * 0.72,
+    y2: start.y + (end.y - start.y) * 0.72,
+    class: 'brb-core',
+  }));
+  const label = createSvg('text', { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 10, class: 'brb-label', 'text-anchor': 'middle' });
   label.textContent = element.mark;
   group.appendChild(label);
   attachElementEvents(group, element);
@@ -275,9 +277,7 @@ function renderGusset(svg, element) {
   const point = getPoint(element.attachedGridPointId);
   if (!point) return;
   const group = createSvg('g', { class: `element gusset-element${elementClass(element)}`, 'data-id': element.id });
-  group.appendChild(createSvg('polygon', {
-    points: `${point.x},${point.y} ${point.x + 34},${point.y} ${point.x},${point.y - 34}`,
-  }));
+  group.appendChild(createSvg('polygon', { points: `${point.x},${point.y} ${point.x + 34},${point.y} ${point.x},${point.y - 34}` }));
   const label = createSvg('text', { x: point.x + 12, y: point.y - 38, class: 'element-label' });
   label.textContent = element.mark;
   group.appendChild(label);
@@ -287,24 +287,11 @@ function renderGusset(svg, element) {
 
 function handleGridPointClick(pointId) {
   if (state.placementMode === 'gusset') {
-    const element = {
-      id: nextElementId('gusset'),
-      type: 'gusset',
-      mark: nextMark('gusset'),
-      attachedGridPointId: pointId,
-      attachedToElementId: '',
-      thickness: '3/4"',
-      width: '18"',
-      height: '24"',
-      boltDiameter: '7/8"',
-      boltQuantity: 6,
-      notes: '',
-    };
+    const element = { id: nextElementId('gusset'), type: 'gusset', mark: nextMark('gusset'), attachedGridPointId: pointId, attachedToElementId: '', thickness: '3/4"', width: '18"', height: '24"', boltDiameter: '7/8"', boltQuantity: 6, notes: '' };
     state.elements.push(element);
     state.selectedElementId = element.id;
     return render();
   }
-
   if (state.placementMode === 'beam' || state.placementMode === 'brb') {
     if (!state.pendingStartPointId) {
       state.pendingStartPointId = pointId;
@@ -320,19 +307,10 @@ function handleGridPointClick(pointId) {
 }
 
 function addColumn() {
+  if (!state.project) return openProjectSetup();
   const point = state.gridPoints[Math.floor(state.gridPoints.length / 2)] || state.gridPoints[0];
   if (!point) return;
-  const element = {
-    id: nextElementId('column'),
-    type: 'column',
-    mark: nextMark('column'),
-    size: 'W14x45',
-    gridPointId: point.id,
-    baseLevel: defaultLevel(),
-    topLevel: lastLevel(),
-    orientation: 'strong-axis',
-    notes: '',
-  };
+  const element = { id: nextElementId('column'), type: 'column', mark: nextMark('column'), size: 'W14x45', gridPointId: point.id, baseLevel: defaultLevel(), topLevel: lastLevel(), orientation: 'strong-axis', notes: '' };
   state.elements.push(element);
   state.selectedElementId = element.id;
   state.placementMode = 'select';
@@ -340,36 +318,13 @@ function addColumn() {
 }
 
 function createBeam(startGridPointId, endGridPointId) {
-  const element = {
-    id: nextElementId('beam'),
-    type: 'beam',
-    mark: nextMark('beam'),
-    size: 'W24x131',
-    startGridPointId,
-    endGridPointId,
-    level: defaultLevel(true),
-    connectionType: 'Shear',
-    notes: '',
-  };
-  state.elements.push(element);
-  state.selectedElementId = element.id;
+  state.elements.push({ id: nextElementId('beam'), type: 'beam', mark: nextMark('beam'), size: 'W24x131', startGridPointId, endGridPointId, level: defaultLevel(true), connectionType: 'Shear', notes: '' });
+  state.selectedElementId = state.elements[state.elements.length - 1].id;
 }
 
 function createBrb(startGridPointId, endGridPointId) {
-  const element = {
-    id: nextElementId('brb'),
-    type: 'brb',
-    mark: nextMark('brb'),
-    frameName: 'BRBF-1',
-    coreArea: '4.5 in2',
-    braceSize: '',
-    startGridPointId,
-    endGridPointId,
-    level: defaultLevel(),
-    notes: '',
-  };
-  state.elements.push(element);
-  state.selectedElementId = element.id;
+  state.elements.push({ id: nextElementId('brb'), type: 'brb', mark: nextMark('brb'), frameName: 'BRBF-1', coreArea: '4.5 in2', braceSize: '', startGridPointId, endGridPointId, level: defaultLevel(), notes: '' });
+  state.selectedElementId = state.elements[state.elements.length - 1].id;
 }
 
 function beginColumnDrag(event, elementId) {
@@ -413,24 +368,18 @@ function handlePointerMove(event) {
 function handlePointerUp(event) {
   if (!state.drag) return;
   state.drag = null;
-  try {
-    els.frameCanvas.releasePointerCapture(event.pointerId);
-  } catch (error) {
-    // Pointer capture may already be released by the browser.
-  }
+  try { els.frameCanvas.releasePointerCapture(event.pointerId); } catch (error) {}
   render();
 }
 
 function renderProperties() {
   const element = selectedElement();
   els.selectedBadge.textContent = element ? `${element.type.toUpperCase()} ${element.id}` : 'No element selected';
-
   if (!element) {
     els.propertiesPanel.className = 'panel-empty';
     els.propertiesPanel.textContent = 'No element selected';
     return;
   }
-
   els.propertiesPanel.className = 'property-form';
   els.propertiesPanel.innerHTML = propertiesTemplate(element);
   els.propertiesPanel.querySelectorAll('input, textarea, select').forEach(input => {
@@ -443,67 +392,16 @@ function optionList(values, selected) {
   return values.map(value => `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('');
 }
 
-function pointOptions(selected) {
-  return optionList(state.gridPoints.map(point => point.id), selected);
-}
-
-function levelOptions(selected) {
-  return optionList(projectLevels(), selected);
-}
+function pointOptions(selected) { return optionList(state.gridPoints.map(point => point.id), selected); }
+function levelOptions(selected) { return optionList(projectLevels(), selected); }
 
 function propertiesTemplate(element) {
-  const shared = `
-    <div class="selection-summary"><span>${escapeHtml(element.type)}</span><strong>${escapeHtml(element.id)}</strong></div>
-    <label>Mark<input name="mark" value="${escapeHtml(element.mark)}" /></label>
-  `;
+  const shared = `<div class="selection-summary"><span>${escapeHtml(element.type)}</span><strong>${escapeHtml(element.id)}</strong></div><label>Mark<input name="mark" value="${escapeHtml(element.mark)}" /></label>`;
   const notes = `<label>Notes<textarea name="notes" rows="4">${escapeHtml(element.notes)}</textarea></label>`;
-  if (element.type === 'column') {
-    return `${shared}
-      <label>Size<input name="size" value="${escapeHtml(element.size)}" /></label>
-      <label>Grid Point<select name="gridPointId">${pointOptions(element.gridPointId)}</select></label>
-      <div class="form-grid">
-        <label>Base Level<select name="baseLevel">${levelOptions(element.baseLevel)}</select></label>
-        <label>Top Level<select name="topLevel">${levelOptions(element.topLevel)}</select></label>
-      </div>
-      <label>Orientation<select name="orientation">${optionList(['strong-axis', 'weak-axis'], element.orientation)}</select></label>
-      ${notes}`;
-  }
-  if (element.type === 'beam') {
-    return `${shared}
-      <label>Size<input name="size" value="${escapeHtml(element.size)}" /></label>
-      <div class="form-grid">
-        <label>Start<select name="startGridPointId">${pointOptions(element.startGridPointId)}</select></label>
-        <label>End<select name="endGridPointId">${pointOptions(element.endGridPointId)}</select></label>
-      </div>
-      <label>Level<select name="level">${levelOptions(element.level)}</select></label>
-      <label>Connection Type<input name="connectionType" value="${escapeHtml(element.connectionType)}" /></label>
-      ${notes}`;
-  }
-  if (element.type === 'brb') {
-    return `${shared}
-      <label>Frame Name<input name="frameName" value="${escapeHtml(element.frameName)}" /></label>
-      <div class="form-grid">
-        <label>Core Area<input name="coreArea" value="${escapeHtml(element.coreArea)}" /></label>
-        <label>Brace Size<input name="braceSize" value="${escapeHtml(element.braceSize)}" /></label>
-      </div>
-      <div class="form-grid">
-        <label>Start<select name="startGridPointId">${pointOptions(element.startGridPointId)}</select></label>
-        <label>End<select name="endGridPointId">${pointOptions(element.endGridPointId)}</select></label>
-      </div>
-      <label>Level<select name="level">${levelOptions(element.level)}</select></label>
-      ${notes}`;
-  }
-  return `${shared}
-    <label>Attached Grid Point<select name="attachedGridPointId">${pointOptions(element.attachedGridPointId)}</select></label>
-    <label>Attached To Element ID<input name="attachedToElementId" value="${escapeHtml(element.attachedToElementId || '')}" /></label>
-    <div class="form-grid">
-      <label>Thickness<input name="thickness" value="${escapeHtml(element.thickness)}" /></label>
-      <label>Width<input name="width" value="${escapeHtml(element.width)}" /></label>
-      <label>Height<input name="height" value="${escapeHtml(element.height)}" /></label>
-      <label>Bolt Dia.<input name="boltDiameter" value="${escapeHtml(element.boltDiameter)}" /></label>
-    </div>
-    <label>Bolt Quantity<input name="boltQuantity" type="number" value="${escapeHtml(element.boltQuantity)}" /></label>
-    ${notes}`;
+  if (element.type === 'column') return `${shared}<label>Size<input name="size" value="${escapeHtml(element.size)}" /></label><label>Grid Point<select name="gridPointId">${pointOptions(element.gridPointId)}</select></label><div class="form-grid"><label>Base Level<select name="baseLevel">${levelOptions(element.baseLevel)}</select></label><label>Top Level<select name="topLevel">${levelOptions(element.topLevel)}</select></label></div><label>Orientation<select name="orientation">${optionList(['strong-axis', 'weak-axis'], element.orientation)}</select></label>${notes}`;
+  if (element.type === 'beam') return `${shared}<label>Size<input name="size" value="${escapeHtml(element.size)}" /></label><div class="form-grid"><label>Start<select name="startGridPointId">${pointOptions(element.startGridPointId)}</select></label><label>End<select name="endGridPointId">${pointOptions(element.endGridPointId)}</select></label></div><label>Level<select name="level">${levelOptions(element.level)}</select></label><label>Connection Type<input name="connectionType" value="${escapeHtml(element.connectionType)}" /></label>${notes}`;
+  if (element.type === 'brb') return `${shared}<label>Frame Name<input name="frameName" value="${escapeHtml(element.frameName)}" /></label><div class="form-grid"><label>Core Area<input name="coreArea" value="${escapeHtml(element.coreArea)}" /></label><label>Brace Size<input name="braceSize" value="${escapeHtml(element.braceSize)}" /></label></div><div class="form-grid"><label>Start<select name="startGridPointId">${pointOptions(element.startGridPointId)}</select></label><label>End<select name="endGridPointId">${pointOptions(element.endGridPointId)}</select></label></div><label>Level<select name="level">${levelOptions(element.level)}</select></label>${notes}`;
+  return `${shared}<label>Attached Grid Point<select name="attachedGridPointId">${pointOptions(element.attachedGridPointId)}</select></label><label>Attached To Element ID<input name="attachedToElementId" value="${escapeHtml(element.attachedToElementId || '')}" /></label><div class="form-grid"><label>Thickness<input name="thickness" value="${escapeHtml(element.thickness)}" /></label><label>Width<input name="width" value="${escapeHtml(element.width)}" /></label><label>Height<input name="height" value="${escapeHtml(element.height)}" /></label><label>Bolt Dia.<input name="boltDiameter" value="${escapeHtml(element.boltDiameter)}" /></label></div><label>Bolt Quantity<input name="boltQuantity" type="number" value="${escapeHtml(element.boltQuantity)}" /></label>${notes}`;
 }
 
 function updateElementField(id, field, value) {
@@ -533,30 +431,13 @@ function levelFor(element) {
 }
 
 function renderTable() {
-  const filtered = state.tableFilter === 'all'
-    ? state.elements
-    : state.elements.filter(element => element.type === state.tableFilter);
-
+  const filtered = state.tableFilter === 'all' ? state.elements : state.elements.filter(element => element.type === state.tableFilter);
   if (!filtered.length) {
     els.dataTableBody.innerHTML = '<tr><td colspan="7" class="empty-row">No elements created.</td></tr>';
     return;
   }
-
-  els.dataTableBody.innerHTML = filtered.map(element => `
-    <tr data-id="${escapeHtml(element.id)}" class="${state.selectedElementId === element.id ? 'selected-row' : ''}">
-      <td>${escapeHtml(element.id)}</td>
-      <td>${escapeHtml(element.type)}</td>
-      <td>${escapeHtml(element.mark)}</td>
-      <td>${escapeHtml(locationFor(element))}</td>
-      <td>${escapeHtml(sizeOrCoreArea(element))}</td>
-      <td>${escapeHtml(levelFor(element))}</td>
-      <td>${escapeHtml(element.notes)}</td>
-    </tr>
-  `).join('');
-
-  els.dataTableBody.querySelectorAll('tr[data-id]').forEach(row => {
-    row.addEventListener('click', () => setSelectedElement(row.dataset.id));
-  });
+  els.dataTableBody.innerHTML = filtered.map(element => `<tr data-id="${escapeHtml(element.id)}" class="${state.selectedElementId === element.id ? 'selected-row' : ''}"><td>${escapeHtml(element.id)}</td><td>${escapeHtml(element.type)}</td><td>${escapeHtml(element.mark)}</td><td>${escapeHtml(locationFor(element))}</td><td>${escapeHtml(sizeOrCoreArea(element))}</td><td>${escapeHtml(levelFor(element))}</td><td>${escapeHtml(element.notes)}</td></tr>`).join('');
+  els.dataTableBody.querySelectorAll('tr[data-id]').forEach(row => row.addEventListener('click', () => setSelectedElement(row.dataset.id)));
 }
 
 function renderModeHint() {
@@ -574,12 +455,8 @@ function render() {
   renderCanvas();
   renderProperties();
   renderTable();
-  document.querySelectorAll('[data-tool]').forEach(button => {
-    button.classList.toggle('active', button.dataset.tool === state.placementMode);
-  });
-  document.querySelectorAll('[data-filter]').forEach(button => {
-    button.classList.toggle('active', button.dataset.filter === state.tableFilter);
-  });
+  document.querySelectorAll('[data-tool]').forEach(button => button.classList.toggle('active', button.dataset.tool === state.placementMode));
+  document.querySelectorAll('[data-filter]').forEach(button => button.classList.toggle('active', button.dataset.filter === state.tableFilter));
 }
 
 function deleteSelected() {
@@ -590,24 +467,15 @@ function deleteSelected() {
 }
 
 function exportCsv() {
+  if (!state.project) return openProjectSetup();
   const headers = ['id', 'type', 'mark', 'location', 'sizeOrCoreArea', 'level', 'notes'];
-  const rows = state.elements.map(element => [
-    element.id,
-    element.type,
-    element.mark,
-    locationFor(element),
-    sizeOrCoreArea(element),
-    levelFor(element),
-    element.notes,
-  ]);
-  const csv = [headers, ...rows]
-    .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n');
+  const rows = state.elements.map(element => [element.id, element.type, element.mark, locationFor(element), sizeOrCoreArea(element), levelFor(element), element.notes]);
+  const csv = [headers, ...rows].map(row => row.map(value => `"${String(value == null ? '' : value).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${state.project?.name || 'structural-elements'}-export.csv`;
+  link.download = `${state.project ? state.project.name : 'structural-elements'}-export.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -620,20 +488,13 @@ function createProject(event) {
   const xGridLabels = parseCsv(document.getElementById('xLabels').value);
   const yGridLabels = parseCsv(document.getElementById('yLabels').value);
   const levels = parseCsv(document.getElementById('levels').value);
-  state.project = {
-    id: `PRJ-${Date.now()}`,
-    name,
-    xGridLabels,
-    yGridLabels,
-    levels,
-    createdAt: new Date().toISOString(),
-  };
+  state.project = { id: `PRJ-${Date.now()}`, name, xGridLabels, yGridLabels, levels, createdAt: new Date().toISOString() };
   state.gridPoints = generateGridPoints(xGridLabels, yGridLabels);
   state.elements = [];
   state.selectedElementId = null;
   state.pendingStartPointId = null;
   state.placementMode = 'select';
-  els.modal.close();
+  closeProjectSetup();
   render();
 }
 
@@ -652,11 +513,12 @@ document.querySelectorAll('[data-filter]').forEach(button => {
 });
 
 els.projectForm.addEventListener('submit', createProject);
+els.projectSetupBtn.addEventListener('click', openProjectSetup);
 els.deleteSelectedBtn.addEventListener('click', deleteSelected);
 els.exportCsvBtn.addEventListener('click', exportCsv);
 els.frameCanvas.addEventListener('pointermove', handlePointerMove);
 els.frameCanvas.addEventListener('pointerup', handlePointerUp);
 els.frameCanvas.addEventListener('pointercancel', handlePointerUp);
 
-els.modal.showModal();
+openProjectSetup();
 render();
