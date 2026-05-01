@@ -14,17 +14,42 @@
         <span id="logoFallback" class="logo-fallback hidden">BRB</span>
         <div>
           <h1>BRB_LB Builder</h1>
-          <p id="projectMeta">Structural frame data builder</p>
+          <p id="projectMeta">Structural frame elevation builder</p>
         </div>
       </div>
       <div class="toolbar-actions" role="toolbar" aria-label="Drawing tools">
-        <button type="button" data-tool="select">Select</button>
-        <button type="button" data-tool="column">Add Column</button>
-        <button type="button" data-tool="beam">Add Beam</button>
-        <button type="button" data-tool="brb">Add BRB</button>
-        <button type="button" data-tool="gusset">Add Gusset Plate</button>
-        <button type="button" id="deleteSelectedBtn">Delete Selected</button>
-        <button type="button" id="exportCsvBtn">Export CSV</button>
+        <button type="button" id="projectSetupBtn" class="ribbon-button">
+          <span class="ribbon-icon">#</span>
+          <span>Project</span>
+        </button>
+        <button type="button" data-tool="select" class="ribbon-button">
+          <span class="ribbon-icon">A</span>
+          <span>Select</span>
+        </button>
+        <button type="button" data-tool="column" class="ribbon-button">
+          <span class="ribbon-icon">C</span>
+          <span>Column</span>
+        </button>
+        <button type="button" data-tool="beam" class="ribbon-button">
+          <span class="ribbon-icon">B</span>
+          <span>Beam</span>
+        </button>
+        <button type="button" data-tool="brb" class="ribbon-button">
+          <span class="ribbon-icon">X</span>
+          <span>BRB</span>
+        </button>
+        <button type="button" data-tool="gusset" class="ribbon-button">
+          <span class="ribbon-icon">G</span>
+          <span>Gusset</span>
+        </button>
+        <button type="button" id="deleteSelectedBtn" class="ribbon-button">
+          <span class="ribbon-icon">Del</span>
+          <span>Delete</span>
+        </button>
+        <button type="button" id="exportCsvBtn" class="ribbon-button">
+          <span class="ribbon-icon">CSV</span>
+          <span>Export</span>
+        </button>
       </div>
     </header>
 
@@ -33,15 +58,15 @@
         <h2>Element Library</h2>
         <button type="button" class="library-card" data-tool="column">
           <span class="library-symbol column"></span>
-          <span><strong>Column</strong><small>Drag and snap to grid</small></span>
+          <span><strong>Column</strong><small>Full-height elevation member</small></span>
         </button>
         <button type="button" class="library-card" data-tool="beam">
           <span class="library-symbol beam"></span>
-          <span><strong>Beam</strong><small>Click start and end grid points</small></span>
+          <span><strong>Beam</strong><small>Click two grid points on one level</small></span>
         </button>
         <button type="button" class="library-card" data-tool="brb">
           <span class="library-symbol brb"></span>
-          <span><strong>BRB Brace</strong><small>Red diagonal brace input</small></span>
+          <span><strong>BRB Brace</strong><small>Diagonal brace in side elevation</small></span>
         </button>
         <button type="button" class="library-card" data-tool="gusset">
           <span class="library-symbol gusset"></span>
@@ -54,7 +79,7 @@
         <dl class="project-facts">
           <div><dt>Name</dt><dd id="projectNameValue">Not set</dd></div>
           <div><dt>X Grid</dt><dd id="xLabelsValue">-</dd></div>
-          <div><dt>Y Grid</dt><dd id="yLabelsValue">-</dd></div>
+          <div><dt>Elevation</dt><dd id="yLabelsValue">-</dd></div>
           <div><dt>Levels</dt><dd id="levelsValue">-</dd></div>
         </dl>
       </section>
@@ -63,8 +88,8 @@
     <main class="central-canvas" aria-label="SVG drawing canvas">
       <div class="canvas-head">
         <div>
-          <h2>Frame Layout</h2>
-          <p id="modeHint">Create a project grid to begin.</p>
+          <h2>Frame Elevation</h2>
+          <p id="modeHint">Create an elevation grid to begin.</p>
         </div>
         <span id="selectedBadge" class="selected-badge">No element selected</span>
       </div>
@@ -113,18 +138,15 @@
     </section>
   </div>
 
-  <dialog id="projectModal">
-    <form id="projectForm" method="dialog" class="modal-form">
+  <div id="projectModal" class="setup-overlay" role="dialog" aria-modal="true" aria-labelledby="projectSetupTitle">
+    <form id="projectForm" class="modal-form">
       <h2>Project Setup</h2>
-      <p>Create the structural grid and project levels.</p>
+      <p>Create the frame grid and vertical elevation levels.</p>
       <label>Project name
         <input id="projectName" type="text" value="BRB Frame Layout" required />
       </label>
       <label>X grid labels
         <input id="xLabels" type="text" value="A,B,C,D" placeholder="A,B,C,D" required />
-      </label>
-      <label>Y grid labels
-        <input id="yLabels" type="text" value="1,2,3,4" placeholder="1,2,3,4" required />
       </label>
       <label>Levels
         <input id="levels" type="text" value="Level 1,Level 2,Roof" placeholder="Level 1,Level 2,Roof" required />
@@ -133,7 +155,7 @@
         <button type="submit">Create Grid</button>
       </div>
     </form>
-  </dialog>
+  </div>
 
   <script src="app.js"></script>
 </body>
