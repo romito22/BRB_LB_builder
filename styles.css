@@ -389,7 +389,8 @@ h2 {
 }
 
 .column-web,
-.column-flange {
+.column-flange,
+.member-edge {
   fill: #ffffff;
   stroke: #111827;
   stroke-width: 1.4;
@@ -403,12 +404,14 @@ h2 {
 
 .beam-web,
 .beam-flange,
-.brb-pin-line {
+.brb-pin-line,
+.member-centerline {
   stroke: #111827;
   stroke-linecap: square;
 }
 
-.beam-web {
+.beam-web,
+.member-centerline {
   stroke-dasharray: 12 5 2 5;
   stroke-width: 0.9;
 }
@@ -428,11 +431,13 @@ h2 {
   stroke-width: 3;
 }
 
+.brb-outline,
 .brb-body,
 .connection-plate {
-  fill: #b91c1c;
+  fill: #ffffff;
   stroke: #111827;
-  stroke-width: 1.35;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
 }
 
 .brb-end-segment {
@@ -442,7 +447,8 @@ h2 {
 }
 
 .connection-plate {
-  fill: #e5e7eb;
+  fill: #ffffff;
+  stroke-width: 1.4;
 }
 
 .brb-centerline {
@@ -457,9 +463,10 @@ h2 {
 
 .gusset-sketch,
 .gusset-element polygon {
-  fill: #f1f3f5;
+  fill: #ffffff;
   stroke: #111827;
-  stroke-width: 1.2;
+  stroke-width: 2;
+  stroke-linejoin: round;
 }
 
 .bolt {
