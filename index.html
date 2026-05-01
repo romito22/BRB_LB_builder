@@ -18,35 +18,24 @@
         </div>
       </div>
       <div class="toolbar-actions" role="toolbar" aria-label="Drawing tools">
-        <button type="button" data-tool="select">Select</button>
-        <button type="button" data-tool="column">Add Column</button>
-        <button type="button" data-tool="beam">Add Beam</button>
-        <button type="button" data-tool="brb">Add BRB</button>
-        <button type="button" data-tool="gusset">Add Gusset Plate</button>
-        <button type="button" id="deleteSelectedBtn">Delete Selected</button>
-        <button type="button" id="exportCsvBtn">Export CSV</button>
+        <button type="button" id="projectSetupBtn" class="ribbon-button"><span class="ribbon-icon">#</span><span>Project</span></button>
+        <button type="button" data-tool="select" class="ribbon-button"><span class="ribbon-icon">A</span><span>Select</span></button>
+        <button type="button" data-tool="column" class="ribbon-button"><span class="ribbon-icon">C</span><span>Column</span></button>
+        <button type="button" data-tool="beam" class="ribbon-button"><span class="ribbon-icon">B</span><span>Beam</span></button>
+        <button type="button" data-tool="brb" class="ribbon-button"><span class="ribbon-icon">X</span><span>BRB</span></button>
+        <button type="button" data-tool="gusset" class="ribbon-button"><span class="ribbon-icon">G</span><span>Gusset</span></button>
+        <button type="button" id="deleteSelectedBtn" class="ribbon-button"><span class="ribbon-icon">Del</span><span>Delete</span></button>
+        <button type="button" id="exportCsvBtn" class="ribbon-button"><span class="ribbon-icon">CSV</span><span>Export</span></button>
       </div>
     </header>
 
     <aside class="left-sidebar" aria-label="Element library">
       <section class="sidebar-section">
         <h2>Element Library</h2>
-        <button type="button" class="library-card" data-tool="column">
-          <span class="library-symbol column"></span>
-          <span><strong>Column</strong><small>Drag and snap to grid</small></span>
-        </button>
-        <button type="button" class="library-card" data-tool="beam">
-          <span class="library-symbol beam"></span>
-          <span><strong>Beam</strong><small>Click start and end grid points</small></span>
-        </button>
-        <button type="button" class="library-card" data-tool="brb">
-          <span class="library-symbol brb"></span>
-          <span><strong>BRB Brace</strong><small>Red diagonal brace input</small></span>
-        </button>
-        <button type="button" class="library-card" data-tool="gusset">
-          <span class="library-symbol gusset"></span>
-          <span><strong>Gusset Plate</strong><small>Attach to grid point</small></span>
-        </button>
+        <button type="button" class="library-card" data-tool="column"><span class="library-symbol column"></span><span><strong>Column</strong><small>Drag and snap to grid</small></span></button>
+        <button type="button" class="library-card" data-tool="beam"><span class="library-symbol beam"></span><span><strong>Beam</strong><small>Click start and end grid points</small></span></button>
+        <button type="button" class="library-card" data-tool="brb"><span class="library-symbol brb"></span><span><strong>BRB Brace</strong><small>Red diagonal brace input</small></span></button>
+        <button type="button" class="library-card" data-tool="gusset"><span class="library-symbol gusset"></span><span><strong>Gusset Plate</strong><small>Attach to grid point</small></span></button>
       </section>
 
       <section class="sidebar-section">
@@ -62,15 +51,10 @@
 
     <main class="central-canvas" aria-label="SVG drawing canvas">
       <div class="canvas-head">
-        <div>
-          <h2>Frame Layout</h2>
-          <p id="modeHint">Create a project grid to begin.</p>
-        </div>
+        <div><h2>Frame Layout</h2><p id="modeHint">Create a project grid to begin.</p></div>
         <span id="selectedBadge" class="selected-badge">No element selected</span>
       </div>
-      <div class="canvas-stage">
-        <svg id="frameCanvas" class="frame-canvas" role="img" aria-label="Structural frame SVG canvas"></svg>
-      </div>
+      <div class="canvas-stage"><svg id="frameCanvas" class="frame-canvas" role="img" aria-label="Structural frame SVG canvas"></svg></div>
     </main>
 
     <aside class="right-properties-panel" aria-label="Properties panel">
@@ -80,10 +64,7 @@
 
     <section class="bottom-data-preview" aria-label="Structural data table">
       <div class="table-head">
-        <div>
-          <h2>Data Table</h2>
-          <p>Clean structural input data for spreadsheet export.</p>
-        </div>
+        <div><h2>Data Table</h2><p>Clean structural input data for spreadsheet export.</p></div>
         <div class="table-tabs" role="tablist" aria-label="Element filters">
           <button type="button" data-filter="all" class="active">All</button>
           <button type="button" data-filter="column">Columns</button>
@@ -94,46 +75,24 @@
       </div>
       <div class="table-scroll">
         <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Type</th>
-              <th>Mark</th>
-              <th>Location</th>
-              <th>Size / Core Area</th>
-              <th>Level</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody id="dataTableBody">
-            <tr><td colspan="7" class="empty-row">No elements created.</td></tr>
-          </tbody>
+          <thead><tr><th>ID</th><th>Type</th><th>Mark</th><th>Location</th><th>Size / Core Area</th><th>Level</th><th>Notes</th></tr></thead>
+          <tbody id="dataTableBody"><tr><td colspan="7" class="empty-row">No elements created.</td></tr></tbody>
         </table>
       </div>
     </section>
   </div>
 
-  <dialog id="projectModal">
-    <form id="projectForm" method="dialog" class="modal-form">
-      <h2>Project Setup</h2>
+  <div id="projectModal" class="setup-overlay" role="dialog" aria-modal="true" aria-labelledby="projectSetupTitle">
+    <form id="projectForm" class="modal-form">
+      <h2 id="projectSetupTitle">Project Setup</h2>
       <p>Create the structural grid and project levels.</p>
-      <label>Project name
-        <input id="projectName" type="text" value="BRB Frame Layout" required />
-      </label>
-      <label>X grid labels
-        <input id="xLabels" type="text" value="A,B,C,D" placeholder="A,B,C,D" required />
-      </label>
-      <label>Y grid labels
-        <input id="yLabels" type="text" value="1,2,3,4" placeholder="1,2,3,4" required />
-      </label>
-      <label>Levels
-        <input id="levels" type="text" value="Level 1,Level 2,Roof" placeholder="Level 1,Level 2,Roof" required />
-      </label>
-      <div class="modal-actions">
-        <button type="submit">Create Grid</button>
-      </div>
+      <label>Project name<input id="projectName" type="text" value="BRB Frame Layout" required /></label>
+      <label>X grid labels<input id="xLabels" type="text" value="A,B,C,D" placeholder="A,B,C,D" required /></label>
+      <label>Y grid labels<input id="yLabels" type="text" value="1,2,3,4" placeholder="1,2,3,4" required /></label>
+      <label>Levels<input id="levels" type="text" value="Level 1,Level 2,Roof" placeholder="Level 1,Level 2,Roof" required /></label>
+      <div class="modal-actions"><button type="submit">Create Grid</button></div>
     </form>
-  </dialog>
+  </div>
 
   <script src="app.js"></script>
 </body>
