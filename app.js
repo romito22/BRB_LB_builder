@@ -11,7 +11,6 @@ const state = {
   gridPoints: [],
   elements: [],
   placementMode: 'select',
-  detailStyle: 'detail',
   pendingStartPointId: null,
   selectedElementId: null,
   tableFilter: 'all',
@@ -34,7 +33,6 @@ const els = {
   yLabelsValue: document.getElementById('yLabelsValue'),
   levelsValue: document.getElementById('levelsValue'),
   projectSetupBtn: document.getElementById('projectSetupBtn'),
-  detailStyleBtn: document.getElementById('detailStyleBtn'),
   deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
   exportCsvBtn: document.getElementById('exportCsvBtn'),
 };
@@ -60,6 +58,10 @@ function nextMark(type) {
 
 function gridPointId(xLabel, yLabel) {
   return `${xLabel}-${yLabel}`;
+}
+
+function projectLevels() {
+  return state.project?.levels?.length ? state.project.levels : ['Level 1'];
 }
 
 function verticalLabels() {
@@ -88,10 +90,6 @@ function getPointById(pointId) {
 
 function getPointByLabels(xLabel, yLabel) {
   return state.gridPoints.find(point => point.xLabel === xLabel && point.yLabel === yLabel);
-}
-
-function projectLevels() {
-  return state.project?.levels?.length ? state.project.levels : ['Level 1'];
 }
 
 function defaultLevel(preferRoof = false) {
@@ -186,7 +184,7 @@ function drawingExtents() {
   const minY = SHEET_PAD_TOP;
   const maxX = SHEET_PAD_X + (xLabels.length - 1) * BAY_SPACING;
   const maxY = SHEET_PAD_TOP + (yLabels.length - 1) * STORY_HEIGHT;
-  return { minX, minY, maxX, maxY, xLabels, yLabels };
+  return { minX, minY, maxX, maxY };
 }
 
 function canvasSize() {
@@ -226,7 +224,7 @@ function closeProjectSetup() {
 
 function updateProjectInfo() {
   if (!state.project) return;
-  els.projectMeta.textContent = `${state.project.name} - ${state.detailStyle === 'detail' ? 'detail' : 'simple'} frame elevation`;
+  els.projectMeta.textContent = `${state.project.name} - frame elevation`;
   els.projectNameValue.textContent = state.project.name;
   els.xLabelsValue.textContent = state.project.xGridLabels.join(', ');
   els.yLabelsValue.textContent = verticalLabels().join(', ');
@@ -239,8 +237,10 @@ function labelTag(x, y, text, anchor = 'start', className = 'label-tag') {
   const height = 18;
   const left = anchor === 'middle' ? x - width / 2 : anchor === 'end' ? x - width : x;
   const group = createSvg('g', { class: className });
-  append(group, createSvg('rect', { x: left, y: y - 13, width, height }), createSvg('text', { x: left + paddingX, y: y, class: 'element-label' }));
-  group.lastChild.textContent = text;
+  const rect = createSvg('rect', { x: left, y: y - 13, width, height });
+  const label = createSvg('text', { x: left + paddingX, y, class: 'element-label' });
+  label.textContent = text;
+  append(group, rect, label);
   return group;
 }
 
@@ -249,7 +249,12 @@ function BoltPattern(point, angle, count = 4, spacing = 11) {
   const axis = angle + Math.PI / 2;
   for (let index = 0; index < count; index += 1) {
     const offset = index - (count - 1) / 2;
-    append(group, createSvg('circle', { cx: point.x + Math.cos(axis) * spacing * offset, cy: point.y + Math.sin(axis) * spacing * offset, r: 3, class: 'bolt' }));
+    append(group, createSvg('circle', {
+      cx: point.x + Math.cos(axis) * spacing * offset,
+      cy: point.y + Math.sin(axis) * spacing * offset,
+      r: 3,
+      class: 'bolt',
+    }));
   }
   return group;
 }
@@ -273,14 +278,36 @@ function rotatedRect(start, end, width, className) {
   return createSvg('polygon', { points, class: className });
 }
 
+function transformedPath(start, end, d, className) {
+  const angleDeg = getAngle(start, end) * 180 / Math.PI;
+  return createSvg('path', { d, class: className, transform: `translate(${start.x} ${start.y}) rotate(${angleDeg})` });
+}
+
+function MemberStickSymbol(start, end, width, className) {
+  const group = createSvg('g', { class: className });
+  const normal = getNormalOffset(start, end, width / 2);
+  append(group,
+    createSvg('line', { x1: start.x + normal.x, y1: start.y + normal.y, x2: end.x + normal.x, y2: end.y + normal.y, class: 'member-edge' }),
+    createSvg('line', { x1: start.x - normal.x, y1: start.y - normal.y, x2: end.x - normal.x, y2: end.y - normal.y, class: 'member-edge' }),
+    Centerline(start, end, 'member-centerline'),
+  );
+  return group;
+}
+
 function DimensionLine(start, end, label, side = 'bottom') {
   const group = createSvg('g', { class: 'dimension' });
   const isVertical = side === 'right';
   append(group, createSvg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: 'dimension-line' }));
   if (isVertical) {
-    append(group, createSvg('path', { d: `M ${start.x} ${start.y} l -4 9 l 8 0 Z M ${end.x} ${end.y} l -4 -9 l 8 0 Z`, class: 'dimension-arrow' }), labelTag(start.x + 16, (start.y + end.y) / 2, label, 'middle'));
+    append(group,
+      createSvg('path', { d: `M ${start.x} ${start.y} l -4 9 l 8 0 Z M ${end.x} ${end.y} l -4 -9 l 8 0 Z`, class: 'dimension-arrow' }),
+      labelTag(start.x + 16, (start.y + end.y) / 2, label, 'middle'),
+    );
   } else {
-    append(group, createSvg('path', { d: `M ${start.x} ${start.y} l 9 -4 l 0 8 Z M ${end.x} ${end.y} l -9 -4 l 0 8 Z`, class: 'dimension-arrow' }), labelTag((start.x + end.x) / 2, start.y + 20, label, 'middle'));
+    append(group,
+      createSvg('path', { d: `M ${start.x} ${start.y} l 9 -4 l 0 8 Z M ${end.x} ${end.y} l -9 -4 l 0 8 Z`, class: 'dimension-arrow' }),
+      labelTag((start.x + end.x) / 2, start.y + 20, label, 'middle'),
+    );
   }
   return group;
 }
@@ -305,7 +332,12 @@ function selectionOutlineFor(element) {
   }
   if (element.type === 'gusset') return createSvg('circle', { cx: start.x, cy: start.y, r: 56, class: 'selection-outline' });
   const normal = getNormalOffset(start, end, 24);
-  const points = [`${start.x + normal.x},${start.y + normal.y}`, `${end.x + normal.x},${end.y + normal.y}`, `${end.x - normal.x},${end.y - normal.y}`, `${start.x - normal.x},${start.y - normal.y}`].join(' ');
+  const points = [
+    `${start.x + normal.x},${start.y + normal.y}`,
+    `${end.x + normal.x},${end.y + normal.y}`,
+    `${end.x - normal.x},${end.y - normal.y}`,
+    `${start.x - normal.x},${start.y - normal.y}`,
+  ].join(' ');
   return createSvg('polygon', { points, class: 'selection-outline' });
 }
 
@@ -354,7 +386,14 @@ function renderGrid(svg, minX, minY, maxX, maxY) {
 function renderDimensions(svg, minX, minY, maxX, maxY) {
   const bottomY = maxY + 116;
   const rightX = maxX + 86;
-  append(svg, createSvg('line', { x1: minX, y1: maxY + 24, x2: minX, y2: bottomY + 10, class: 'extension-line' }), createSvg('line', { x1: maxX, y1: maxY + 24, x2: maxX, y2: bottomY + 10, class: 'extension-line' }), DimensionLine({ x: minX, y: bottomY }, { x: maxX, y: bottomY }, 'Frame Width'), createSvg('line', { x1: maxX + 24, y1: minY, x2: rightX + 10, y2: minY, class: 'extension-line' }), createSvg('line', { x1: maxX + 24, y1: maxY, x2: rightX + 10, y2: maxY, class: 'extension-line' }), DimensionLine({ x: rightX, y: minY }, { x: rightX, y: maxY }, 'Frame Height', 'right'));
+  append(svg,
+    createSvg('line', { x1: minX, y1: maxY + 24, x2: minX, y2: bottomY + 10, class: 'extension-line' }),
+    createSvg('line', { x1: maxX, y1: maxY + 24, x2: maxX, y2: bottomY + 10, class: 'extension-line' }),
+    DimensionLine({ x: minX, y: bottomY }, { x: maxX, y: bottomY }, 'Frame Width'),
+    createSvg('line', { x1: maxX + 24, y1: minY, x2: rightX + 10, y2: minY, class: 'extension-line' }),
+    createSvg('line', { x1: maxX + 24, y1: maxY, x2: rightX + 10, y2: maxY, class: 'extension-line' }),
+    DimensionLine({ x: rightX, y: minY }, { x: rightX, y: maxY }, 'Frame Height', 'right'),
+  );
 }
 
 function renderGridPoints(svg) {
@@ -418,11 +457,10 @@ function ColumnSymbol(element) {
   const x = base.x;
   const y1 = Math.min(base.y, top.y);
   const y2 = Math.max(base.y, top.y);
-  if (state.detailStyle === 'simple') {
-    append(group, createSvg('rect', { x: x - 7, y: y1, width: 14, height: y2 - y1, class: 'column-web' }));
-  } else {
-    append(group, createSvg('rect', { x: x - 5, y: y1, width: 10, height: y2 - y1, class: 'column-web' }), createSvg('rect', { x: x - 22, y: y1 - 10, width: 7, height: y2 - y1 + 20, class: 'column-flange' }), createSvg('rect', { x: x + 15, y: y1 - 10, width: 7, height: y2 - y1 + 20, class: 'column-flange' }), createSvg('rect', { x: x - 27, y: y2 + 4, width: 54, height: 7, class: 'column-cap' }));
-  }
+  append(group,
+    MemberStickSymbol({ x, y: y1 }, { x, y: y2 }, 24, 'column-stick'),
+    createSvg('rect', { x: x - 27, y: y2 + 4, width: 54, height: 7, class: 'column-cap' }),
+  );
   append(group, labelTag(x + 28, y1 + 20, element.mark));
   group.addEventListener('pointerdown', event => beginColumnDrag(event, element.id));
   attachElementEvents(group, element);
@@ -434,11 +472,7 @@ function BeamSymbol(element) {
   const group = createSvg('g', { class: `element beam-element${elementClass(element)}`, 'data-id': element.id });
   if (!start || !end) return group;
   const y = start.y;
-  if (state.detailStyle === 'simple') {
-    append(group, createSvg('line', { x1: start.x, y1: y, x2: end.x, y2: y, class: 'beam-flange' }));
-  } else {
-    append(group, createSvg('rect', { x: Math.min(start.x, end.x), y: y - 11, width: Math.abs(end.x - start.x), height: 22, class: 'beam-fill' }), createSvg('line', { x1: start.x, y1: y - 11, x2: end.x, y2: y - 11, class: 'beam-flange' }), createSvg('line', { x1: start.x, y1: y + 11, x2: end.x, y2: y + 11, class: 'beam-flange' }), createSvg('line', { x1: start.x, y1: y, x2: end.x, y2: y, class: 'beam-web' }));
-  }
+  append(group, MemberStickSymbol({ x: start.x, y }, { x: end.x, y }, 24, 'beam-stick'));
   append(group, labelTag((start.x + end.x) / 2, y - 24, element.mark, 'middle'));
   attachElementEvents(group, element);
   return group;
@@ -455,16 +489,9 @@ function BRBSymbol(element) {
   const uy = (end.y - start.y) / length;
   const centerStart = { x: start.x - ux * 24, y: start.y - uy * 24 };
   const centerEnd = { x: end.x + ux * 24, y: end.y + uy * 24 };
-  const bodyStart = getOffsetPoint(start, angle, state.detailStyle === 'detail' ? 72 : 20);
-  const bodyEnd = getOffsetPoint(end, angle + Math.PI, state.detailStyle === 'detail' ? 72 : 20);
-  append(group, Centerline(centerStart, centerEnd));
-  if (state.detailStyle === 'simple') {
-    append(group, rotatedRect(bodyStart, bodyEnd, 16, 'brb-body'));
-  } else {
-    append(group, rotatedRect(getOffsetPoint(start, angle, 24), getOffsetPoint(start, angle, 74), 13, 'brb-end-segment'), rotatedRect(bodyStart, bodyEnd, 22, 'brb-body'), rotatedRect(getOffsetPoint(end, angle + Math.PI, 24), getOffsetPoint(end, angle + Math.PI, 74), 13, 'brb-end-segment'));
-    renderBraceEndDetail(group, start, angle, 1);
-    renderBraceEndDetail(group, end, angle + Math.PI, -1);
-  }
+  append(group, BrbOutline(start, end), Centerline(centerStart, centerEnd));
+  renderBraceEndDetail(group, start, angle, 1);
+  renderBraceEndDetail(group, end, angle + Math.PI, -1);
   const mid = getMidpoint(start, end);
   const normal = getNormalOffset(start, end, -28);
   append(group, labelTag(mid.x + normal.x, mid.y + normal.y, element.mark, 'middle'));
@@ -472,10 +499,38 @@ function BRBSymbol(element) {
   return group;
 }
 
+function BrbOutline(start, end) {
+  const length = Math.max(120, distanceToPoint(start, end));
+  const nose = Math.min(32, length * 0.16);
+  const notch = Math.min(44, length * 0.2);
+  const d = [
+    `M ${nose} -18`,
+    `L ${length - notch} -18`,
+    `L ${length - notch + 10} -29`,
+    `Q ${length - 5} -38 ${length + 18} -19`,
+    `Q ${length + 36} -2 ${length + 16} 18`,
+    `L ${length - notch + 10} 29`,
+    `L ${length - notch} 18`,
+    `L ${nose} 18`,
+    `L ${nose - 10} 29`,
+    `Q ${-8} 38 ${-24} 19`,
+    `Q ${-38} 0 ${-24} -19`,
+    `Q ${-8} -38 ${nose - 10} -29`,
+    'Z',
+  ].join(' ');
+  return transformedPath(start, end, d, 'brb-outline');
+}
+
 function renderBraceEndDetail(group, point, angle, side) {
-  const plateNear = getOffsetPoint(point, angle, 16);
-  const plateFar = getOffsetPoint(point, angle, 62);
-  append(group, gussetPolygon(point, angle, 72, 44, side), rotatedRect(plateNear, plateFar, 25, 'connection-plate'), Centerline(point, plateFar, 'brb-pin-line'), createSvg('circle', { cx: point.x, cy: point.y, r: 5, class: 'bolt' }), BoltPattern(getOffsetPoint(point, angle, 40), angle, 4, 9));
+  const plateNear = getOffsetPoint(point, angle, 10);
+  const plateFar = getOffsetPoint(point, angle, 48);
+  append(group,
+    gussetPolygon(point, angle, 64, 38, side),
+    rotatedRect(plateNear, plateFar, 18, 'connection-plate'),
+    Centerline(point, plateFar, 'brb-pin-line'),
+    createSvg('circle', { cx: point.x, cy: point.y, r: 5, class: 'bolt' }),
+    BoltPattern(getOffsetPoint(point, angle, 30), angle, 3, 9),
+  );
 }
 
 function gussetPolygon(point, angle, length = 62, depth = 42, side = 1) {
@@ -483,7 +538,17 @@ function gussetPolygon(point, angle, length = 62, depth = 42, side = 1) {
   const uy = Math.sin(angle);
   const nx = -uy * side;
   const ny = ux * side;
-  const points = [`${point.x},${point.y}`, `${point.x + ux * length + nx * depth},${point.y + uy * length + ny * depth}`, `${point.x + ux * length - nx * 8},${point.y + uy * length - ny * 8}`].join(' ');
+  const shoulder = length * 0.48;
+  const chamferX = length * 0.72;
+  const midDepth = depth * 0.36;
+  const points = [
+    `${point.x},${point.y}`,
+    `${point.x + nx * depth},${point.y + ny * depth}`,
+    `${point.x + ux * shoulder + nx * depth},${point.y + uy * shoulder + ny * depth}`,
+    `${point.x + ux * chamferX + nx * midDepth},${point.y + uy * chamferX + ny * midDepth}`,
+    `${point.x + ux * length + nx * midDepth},${point.y + uy * length + ny * midDepth}`,
+    `${point.x + ux * length},${point.y + uy * length}`,
+  ].join(' ');
   return createSvg('polygon', { points, class: 'gusset-sketch' });
 }
 
@@ -501,11 +566,12 @@ function GussetPlateSymbol(element) {
       side = point.id === start.id ? 1 : -1;
     }
   }
-  if (state.detailStyle === 'simple') {
-    append(group, gussetPolygon(point, angle, 54, 34, side));
-  } else {
-    append(group, gussetPolygon(point, angle, 72, 48, side), Centerline(point, getOffsetPoint(point, angle, 62)), BoltPattern(getOffsetPoint(point, angle, 35), angle, Number(element.boltQuantity) || 6, 9), createSvg('circle', { cx: point.x, cy: point.y, r: 4, class: 'bolt' }));
-  }
+  append(group,
+    gussetPolygon(point, angle, 72, 48, side),
+    Centerline(point, getOffsetPoint(point, angle, 62)),
+    BoltPattern(getOffsetPoint(point, angle, 35), angle, Number(element.boltQuantity) || 6, 9),
+    createSvg('circle', { cx: point.x, cy: point.y, r: 4, class: 'bolt' }),
+  );
   const labelPoint = getOffsetPoint(point, angle, 32);
   append(group, labelTag(labelPoint.x + 10, labelPoint.y - 20, element.mark));
   attachElementEvents(group, element);
@@ -566,7 +632,17 @@ function addColumnAtPoint(pointId) {
   const point = getPointById(pointId);
   if (!point) return;
   const base = getPointByLabels(point.xLabel, defaultLevel()) || point;
-  const element = { id: nextElementId('column'), type: 'column', mark: nextMark('column'), size: 'W14x45', gridPointId: base.id, baseLevel: defaultLevel(), topLevel: lastLevel(), orientation: 'strong-axis', notes: '' };
+  const element = {
+    id: nextElementId('column'),
+    type: 'column',
+    mark: nextMark('column'),
+    size: 'W14x45',
+    gridPointId: base.id,
+    baseLevel: defaultLevel(),
+    topLevel: lastLevel(),
+    orientation: 'strong-axis',
+    notes: '',
+  };
   state.elements.push(element);
   state.selectedElementId = element.id;
   state.placementMode = 'select';
@@ -576,19 +652,52 @@ function addColumnAtPoint(pointId) {
 function createBeam(startGridPointId, endGridPointId) {
   const start = getPointById(startGridPointId);
   const end = getPointById(endGridPointId);
-  const element = { id: nextElementId('beam'), type: 'beam', mark: nextMark('beam'), size: 'W24x131', startGridPointId, endGridPointId, level: start?.yLabel || end?.yLabel || defaultLevel(true), connectionType: 'Shear', notes: '' };
+  const element = {
+    id: nextElementId('beam'),
+    type: 'beam',
+    mark: nextMark('beam'),
+    size: 'W24x131',
+    startGridPointId,
+    endGridPointId,
+    level: start?.yLabel || end?.yLabel || defaultLevel(true),
+    connectionType: 'Shear',
+    notes: '',
+  };
   state.elements.push(element);
   state.selectedElementId = element.id;
 }
 
 function createBrb(startGridPointId, endGridPointId) {
-  const element = { id: nextElementId('brb'), type: 'brb', mark: nextMark('brb'), frameName: 'BRBF-1', coreArea: '4.5 in2', braceSize: '', startGridPointId, endGridPointId, level: defaultLevel(), notes: '' };
+  const element = {
+    id: nextElementId('brb'),
+    type: 'brb',
+    mark: nextMark('brb'),
+    frameName: 'BRBF-1',
+    coreArea: '4.5 in2',
+    braceSize: '',
+    startGridPointId,
+    endGridPointId,
+    level: defaultLevel(),
+    notes: '',
+  };
   state.elements.push(element);
   state.selectedElementId = element.id;
 }
 
 function createGusset(pointId, attachedToElementId = '') {
-  const element = { id: nextElementId('gusset'), type: 'gusset', mark: nextMark('gusset'), attachedGridPointId: pointId, attachedToElementId, thickness: '3/4"', width: '18"', height: '24"', boltDiameter: '7/8"', boltQuantity: 6, notes: '' };
+  const element = {
+    id: nextElementId('gusset'),
+    type: 'gusset',
+    mark: nextMark('gusset'),
+    attachedGridPointId: pointId,
+    attachedToElementId,
+    thickness: '3/4"',
+    width: '18"',
+    height: '24"',
+    boltDiameter: '7/8"',
+    boltQuantity: 6,
+    notes: '',
+  };
   state.elements.push(element);
   state.selectedElementId = element.id;
   state.placementMode = 'select';
@@ -611,7 +720,7 @@ function nearestBrbEndpoint(brbElement, svgPoint, maxDistance = SNAP_DISTANCE) {
       bestDistance = distance;
     }
   });
-  return bestDistance <= maxDistance ? { ...best.point, elementId: best.elementId } : null;
+  return best && bestDistance <= maxDistance ? { ...best.point, elementId: best.elementId } : null;
 }
 
 function beginColumnDrag(event, elementId) {
@@ -818,9 +927,6 @@ function render() {
   document.querySelectorAll('[data-filter]').forEach(button => {
     button.classList.toggle('active', button.dataset.filter === state.tableFilter);
   });
-  els.detailStyleBtn.classList.toggle('active', state.detailStyle === 'detail');
-  els.detailStyleBtn.setAttribute('aria-pressed', String(state.detailStyle === 'detail'));
-  els.detailStyleBtn.querySelector('span:last-child').textContent = state.detailStyle === 'detail' ? 'Detail' : 'Simple';
 }
 
 function deleteSelected() {
@@ -837,7 +943,9 @@ function exportCsv() {
   }
   const headers = ['id', 'type', 'mark', 'location', 'sizeOrCoreArea', 'level', 'notes'];
   const rows = state.elements.map(element => [element.id, element.type, element.mark, locationFor(element), sizeOrCoreArea(element), levelFor(element), element.notes]);
-  const csv = [headers, ...rows].map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = [headers, ...rows]
+    .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -928,10 +1036,6 @@ document.querySelectorAll('[data-filter]').forEach(button => {
 
 els.projectForm.addEventListener('submit', createProject);
 els.projectSetupBtn.addEventListener('click', openProjectSetup);
-els.detailStyleBtn.addEventListener('click', () => {
-  state.detailStyle = state.detailStyle === 'detail' ? 'simple' : 'detail';
-  render();
-});
 els.deleteSelectedBtn.addEventListener('click', deleteSelected);
 els.exportCsvBtn.addEventListener('click', exportCsv);
 els.frameCanvas.addEventListener('pointermove', handlePointerMove);
