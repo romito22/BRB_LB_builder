@@ -176,9 +176,7 @@ function canvasSize() {
 function renderCanvas() {
   const svg = els.frameCanvas;
   svg.innerHTML = '';
-  svg.onclick = () => {
-    if (state.placementMode === 'select') setSelectedElement(null);
-  };
+  svg.onclick = handleCanvasClick;
   const size = canvasSize();
   svg.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);
   svg.setAttribute('width', size.width);
@@ -249,7 +247,6 @@ function attachElementEvents(node, element) {
 }
 
 function appendMemberLine(group, x1, y1, x2, y2, className) {
-  group.appendChild(createSvg('line', { x1, y1, x2, y2, class: `${className} member-shadow` }));
   group.appendChild(createSvg('line', { x1, y1, x2, y2, class: className }));
 }
 
@@ -271,7 +268,7 @@ function appendRotatedRect(group, start, end, width, attrs) {
 }
 
 function renderBoltGroup(group, point, angle, count = 4) {
-  const spacing = 11;
+  const spacing = 10;
   const dx = Math.cos(angle) * spacing;
   const dy = Math.sin(angle) * spacing;
   for (let index = 0; index < count; index += 1) {
@@ -279,10 +276,21 @@ function renderBoltGroup(group, point, angle, count = 4) {
     group.appendChild(createSvg('circle', {
       cx: point.x + dx * offset,
       cy: point.y + dy * offset,
-      r: 3.2,
+      r: 2.5,
       class: 'bolt',
     }));
   }
+}
+
+function appendGussetAtJoint(group, joint, ux, uy, length, depth) {
+  const nx = -uy;
+  const ny = ux;
+  const points = [
+    `${joint.x},${joint.y}`,
+    `${joint.x + ux * length + nx * depth},${joint.y + uy * length + ny * depth}`,
+    `${joint.x + ux * length - nx * depth},${joint.y + uy * length - ny * depth}`,
+  ].join(' ');
+  group.appendChild(createSvg('polygon', { points, class: 'gusset-sketch' }));
 }
 
 function renderElevationDimensions(svg, minX, minY, maxX, maxY) {
@@ -358,15 +366,18 @@ function renderBrb(svg, element) {
   const uy = (end.y - start.y) / length;
   const braceStart = { x: start.x + ux * inset, y: start.y + uy * inset };
   const braceEnd = { x: end.x - ux * inset, y: end.y - uy * inset };
-  appendRotatedRect(group, braceStart, braceEnd, 24, { class: 'brb-body' });
-  group.appendChild(createSvg('line', { x1: braceStart.x, y1: braceStart.y, x2: braceEnd.x, y2: braceEnd.y, class: 'brb-centerline' }));
+  group.appendChild(createSvg('line', { x1: start.x - ux * 26, y1: start.y - uy * 26, x2: end.x + ux * 26, y2: end.y + uy * 26, class: 'brb-centerline' }));
+  appendRotatedRect(group, braceStart, braceEnd, 16, { class: 'brb-body' });
   [start, end].forEach((point, index) => {
     const dir = index === 0 ? 1 : -1;
-    const tip = { x: point.x + ux * inset * dir, y: point.y + uy * inset * dir };
-    const shoulder = { x: point.x + ux * 58 * dir, y: point.y + uy * 58 * dir };
-    appendRotatedRect(group, point, shoulder, 38, { class: 'gusset-sketch' });
-    group.appendChild(createSvg('line', { x1: point.x, y1: point.y, x2: tip.x, y2: tip.y, class: 'brb-pin-line' }));
-    renderBoltGroup(group, { x: point.x + ux * 22 * dir, y: point.y + uy * 22 * dir }, angle, 4);
+    const localUx = ux * dir;
+    const localUy = uy * dir;
+    const plateStart = { x: point.x + localUx * 22, y: point.y + localUy * 22 };
+    const plateEnd = { x: point.x + localUx * 78, y: point.y + localUy * 78 };
+    appendGussetAtJoint(group, point, localUx, localUy, 76, 34);
+    appendRotatedRect(group, plateStart, plateEnd, 20, { class: 'connection-plate' });
+    group.appendChild(createSvg('line', { x1: point.x, y1: point.y, x2: plateEnd.x, y2: plateEnd.y, class: 'brb-pin-line' }));
+    renderBoltGroup(group, { x: point.x + localUx * 45, y: point.y + localUy * 45 }, angle, 4);
   });
   const label = createSvg('text', {
     x: (start.x + end.x) / 2,
@@ -385,9 +396,10 @@ function renderGusset(svg, element) {
   if (!point) return;
   const group = createSvg('g', { class: `element gusset-element${elementClass(element)}`, 'data-id': element.id });
   group.appendChild(createSvg('polygon', {
-    points: `${point.x},${point.y} ${point.x + 54},${point.y} ${point.x},${point.y - 54}`,
+    points: `${point.x},${point.y} ${point.x + 58},${point.y} ${point.x},${point.y - 58}`,
   }));
-  renderBoltGroup(group, { x: point.x + 22, y: point.y - 18 }, -0.8, Number(element.boltQuantity) || 4);
+  group.appendChild(createSvg('line', { x1: point.x + 9, y1: point.y - 9, x2: point.x + 49, y2: point.y - 49, class: 'brb-centerline' }));
+  renderBoltGroup(group, { x: point.x + 25, y: point.y - 20 }, -0.8, Number(element.boltQuantity) || 4);
   const label = createSvg('text', { x: point.x + 12, y: point.y - 38, class: 'element-label' });
   label.textContent = element.mark;
   group.appendChild(label);
@@ -427,6 +439,19 @@ function handleGridPointClick(pointId) {
     state.placementMode = 'select';
     return render();
   }
+}
+
+function handleCanvasClick(event) {
+  if (!state.project) return;
+  if (event.target.closest?.('.element')) return;
+
+  if (state.placementMode === 'beam' || state.placementMode === 'brb' || state.placementMode === 'gusset') {
+    const nearest = nearestGridPoint(eventToSvgPoint(event));
+    if (nearest) handleGridPointClick(nearest.id);
+    return;
+  }
+
+  if (state.placementMode === 'select') setSelectedElement(null);
 }
 
 function addColumn() {
