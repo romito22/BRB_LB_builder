@@ -10,69 +10,135 @@
   <div class="app-shell">
     <header class="top-toolbar">
       <div class="brand-wrap">
-        <img src="assets/logo_brb.png" alt="BRB LB" class="logo" onerror="document.getElementById('logoFallback').style.display='inline';this.style.display='none'" />
+        <img src="assets/logo_brb.png" alt="BRB LB" class="logo" onerror="document.getElementById('logoFallback').style.display='inline-flex';this.style.display='none'" />
         <span id="logoFallback" class="logo-fallback hidden">BRB</span>
-        <h1>BRB_LB Builder</h1>
+        <div>
+          <h1>BRB_LB Builder</h1>
+          <p>Structural frame data builder</p>
+        </div>
       </div>
-      <div class="toolbar-actions">
-        <button id="newProjectBtn">New Project</button>
+      <div class="toolbar-actions" role="toolbar" aria-label="Project tools">
+        <button id="newProjectBtn" type="button">New Project</button>
+        <button id="columnToolBtn" type="button" class="tool-button active" aria-pressed="true">Column</button>
+        <button id="exportCsvBtn" type="button">Export CSV</button>
       </div>
     </header>
 
-    <aside class="left-sidebar">
-      <h2>Project</h2>
-      <p><strong>Name:</strong> <span id="projectNameValue">Not set</span></p>
-      <p><strong>X:</strong> <span id="xLabelsValue">-</span></p>
-      <p><strong>Y:</strong> <span id="yLabelsValue">-</span></p>
+    <aside class="left-sidebar" aria-label="Project sidebar">
+      <section class="sidebar-section">
+        <h2>Project</h2>
+        <dl class="project-facts">
+          <div><dt>Name</dt><dd id="projectNameValue">Not set</dd></div>
+          <div><dt>X Grid</dt><dd id="xLabelsValue">-</dd></div>
+          <div><dt>Y Grid</dt><dd id="yLabelsValue">-</dd></div>
+        </dl>
+      </section>
+      <section class="sidebar-section">
+        <h2>Elements</h2>
+        <button id="sidebarColumnTool" type="button" class="tool-row active">
+          <span class="tool-dot"></span>
+          Column
+        </button>
+      </section>
+      <section class="sidebar-section">
+        <h2>Counts</h2>
+        <p class="metric"><span id="columnCount">0</span><small>columns</small></p>
+      </section>
     </aside>
 
-    <main class="central-canvas">
-      <div class="empty-state" id="emptyState">Create a project to render the grid.</div>
-      <div id="gridContainer"></div>
+    <main class="central-canvas" aria-label="Frame canvas">
+      <div class="canvas-head">
+        <div>
+          <h2 id="canvasTitle">Frame Layout</h2>
+          <p id="canvasSubtitle">Create a project to render the grid.</p>
+        </div>
+        <span id="selectedBadge" class="selected-badge">No point selected</span>
+      </div>
+      <div class="canvas-stage">
+        <div class="empty-state" id="emptyState">Set up X and Y grid labels to begin placing structural columns.</div>
+        <svg id="frameCanvas" class="frame-canvas" role="img" aria-label="Structural frame grid"></svg>
+      </div>
     </main>
 
-    <aside class="right-properties-panel" id="propertiesPanel">
+    <aside class="right-properties-panel" id="propertiesPanel" aria-label="Properties panel">
       <h2>Properties</h2>
-      <div id="propertiesEmpty">Click a grid intersection to configure a column.</div>
-      <form id="columnForm" class="hidden">
-        <p><strong>Grid Point:</strong> <span id="selectedLocation"></span></p>
-        <label>Mark <input id="colMark" required /></label>
-        <label>Size <input id="colSize" required placeholder="W14x120" /></label>
-        <label>Base Level <input id="colBaseLevel" required placeholder="Level 1" /></label>
-        <label>Top Level <input id="colTopLevel" required placeholder="Level 2" /></label>
-        <label>Notes <textarea id="colNotes" rows="3" placeholder="Optional"></textarea></label>
-        <button type="submit">Save Column</button>
+      <div id="propertiesEmpty" class="panel-empty">
+        Select a grid intersection to place or edit a column.
+      </div>
+      <form id="columnForm" class="property-form hidden">
+        <div class="selection-summary">
+          <span>Selected Grid Point</span>
+          <strong id="selectedLocation">-</strong>
+        </div>
+        <label>Mark
+          <input id="colMark" autocomplete="off" placeholder="CB-8.00" required />
+        </label>
+        <label>Size
+          <input id="colSize" autocomplete="off" placeholder="W14X120" required />
+        </label>
+        <div class="form-grid">
+          <label>Base Level
+            <input id="colBaseLevel" autocomplete="off" placeholder="Level 1" required />
+          </label>
+          <label>Top Level
+            <input id="colTopLevel" autocomplete="off" placeholder="Level 2" required />
+          </label>
+        </div>
+        <label>Notes
+          <textarea id="colNotes" rows="4" placeholder="Optional connection or erection notes"></textarea>
+        </label>
+        <div class="form-actions">
+          <button id="saveColumnBtn" type="submit">Save Column</button>
+          <button id="deleteColumnBtn" type="button" class="secondary hidden">Delete</button>
+        </div>
       </form>
     </aside>
 
-    <section class="bottom-data-preview">
-      <h2>Data Preview: Columns</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Grid Location</th>
-            <th>Mark</th>
-            <th>Size</th>
-            <th>Base Level</th>
-            <th>Top Level</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody id="dataTableBody">
-          <tr><td colspan="7">No columns created.</td></tr>
-        </tbody>
-      </table>
+    <section class="bottom-data-preview" aria-label="Column data preview">
+      <div class="table-head">
+        <div>
+          <h2>Column Data Preview</h2>
+          <p>All placed columns are collected here for the combined export table.</p>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Grid Location</th>
+              <th>Mark</th>
+              <th>Size</th>
+              <th>Base Level</th>
+              <th>Top Level</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="dataTableBody">
+            <tr><td colspan="7" class="empty-row">No columns created.</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </div>
 
   <dialog id="projectModal">
-    <form id="projectForm" method="dialog">
+    <form id="projectForm" method="dialog" class="modal-form">
       <h2>Project Setup</h2>
-      <label>Project name <input id="projectName" type="text" required /></label>
-      <label>X grid labels (CSV) <input id="xLabels" type="text" placeholder="A,B,C,D" required /></label>
-      <label>Y grid labels (CSV) <input id="yLabels" type="text" placeholder="1,2,3,4" required /></label>
-      <div class="modal-actions"><button type="submit">Create Grid</button></div>
+      <p>Define the grid labels used to place structural elements.</p>
+      <label>Project name
+        <input id="projectName" type="text" value="BRB Frame Layout" required />
+      </label>
+      <label>X grid labels
+        <input id="xLabels" type="text" value="A,B,C,D" placeholder="A,B,C,D" required />
+      </label>
+      <label>Y grid labels
+        <input id="yLabels" type="text" value="1,2,3,4" placeholder="1,2,3,4" required />
+      </label>
+      <div class="modal-actions">
+        <button id="cancelProjectBtn" type="button" class="secondary">Cancel</button>
+        <button type="submit">Create Grid</button>
+      </div>
     </form>
   </dialog>
 
