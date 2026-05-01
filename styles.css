@@ -22,7 +22,6 @@ textarea {
 }
 
 button {
-  min-height: 32px;
   border: 1px solid #c8d0d9;
   border-radius: 4px;
   background: #ffffff;
@@ -119,8 +118,61 @@ h2 {
 .toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 7px;
+  align-self: stretch;
+  gap: 0;
   overflow-x: auto;
+}
+
+.ribbon-button {
+  display: grid;
+  grid-template-rows: 24px 18px;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  min-width: 68px;
+  height: 58px;
+  border-width: 0 0 0 1px;
+  border-color: #e0e5eb;
+  border-radius: 0;
+  background: #ffffff;
+  color: #2b3138;
+  font-size: 12px;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.ribbon-button:last-child {
+  border-right-width: 1px;
+}
+
+.ribbon-button:hover {
+  background: #f7f9fb;
+}
+
+.ribbon-button.active {
+  border-color: #e0e5eb;
+  background: #fff4d8;
+  color: #111827;
+}
+
+.ribbon-icon {
+  display: inline-grid;
+  align-items: center;
+  justify-items: center;
+  min-width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #47515d;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ribbon-button.active .ribbon-icon {
+  border-color: #e6b422;
+  background: #ffd35a;
+  color: #17202a;
 }
 
 .left-sidebar,
@@ -144,16 +196,30 @@ h2 {
 
 .library-card {
   display: grid;
-  grid-template-columns: 36px 1fr;
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   width: 100%;
   min-height: 52px;
   text-align: left;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.library-card span:last-child {
+  min-width: 0;
+}
+
+.library-card strong,
+.library-card small {
+  display: block;
+}
+
+.library-card strong {
+  overflow-wrap: anywhere;
 }
 
 .library-card small {
-  display: block;
   margin-top: 2px;
   color: #65717f;
   font-size: 11px;
@@ -301,45 +367,69 @@ h2 {
   cursor: pointer;
 }
 
-.column-element rect {
-  fill: #3d424a;
-  stroke: #2b3036;
+.column-web,
+.column-flange {
+  fill: #ffffff;
+  stroke: #111827;
+  stroke-width: 1.8;
+}
+
+.beam-web,
+.beam-flange,
+.brb-pin-line {
+  stroke: #111827;
+  stroke-linecap: square;
+}
+
+.beam-web {
+  stroke-dasharray: 12 5 2 5;
+  stroke-width: 1.4;
+}
+
+.beam-flange {
+  stroke-width: 2.2;
+}
+
+.member-shadow {
+  stroke: #ffffff;
+  stroke-width: 8;
+}
+
+.brb-body {
+  fill: #ffffff;
+  stroke: #111827;
+  stroke-width: 2.1;
+}
+
+.brb-centerline {
+  stroke: #111827;
+  stroke-dasharray: 10 5 2 5;
+  stroke-width: 1.2;
+}
+
+.brb-pin-line {
   stroke-width: 2;
 }
 
-.column-element line,
-.beam-element line {
-  stroke: #3d424a;
-  stroke-linecap: round;
-  stroke-width: 9;
-}
-
-.beam-element line {
-  stroke-width: 10;
-}
-
-.brb-outer {
-  stroke: #b91c1c;
-  stroke-linecap: round;
-  stroke-width: 5;
-}
-
-.brb-core {
-  stroke: #dc2626;
-  stroke-linecap: round;
-  stroke-width: 12;
-}
-
+.gusset-sketch,
 .gusset-element polygon {
-  fill: #8a919b;
-  stroke: #68707a;
-  stroke-width: 2;
+  fill: rgba(255, 255, 255, 0.78);
+  stroke: #111827;
+  stroke-width: 1.8;
+}
+
+.bolt {
+  fill: #ffffff;
+  stroke: #111827;
+  stroke-width: 1.4;
 }
 
 .selected-element rect,
-.selected-element polygon {
+.selected-element polygon,
+.selected-element .brb-body,
+.selected-element .gusset-sketch {
   stroke: #ef2626;
-  stroke-width: 4;
+  stroke-width: 3;
 }
 
 .selected-element line {
@@ -357,7 +447,33 @@ h2 {
 }
 
 .brb-label {
-  fill: #b91c1c;
+  fill: #111827;
+}
+
+.dimension-line,
+.extension-line {
+  stroke: #111827;
+  stroke-width: 1.1;
+}
+
+.extension-line {
+  stroke-width: 0.9;
+}
+
+.dimension-arrow {
+  fill: #111827;
+}
+
+.dimension-label {
+  fill: #111827;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.vertical-label {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(-90deg);
 }
 
 .right-properties-panel {
@@ -506,16 +622,26 @@ tbody tr[data-id]:hover,
   text-align: center;
 }
 
-dialog {
+.setup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(31, 35, 40, 0.38);
+}
+
+.setup-overlay.is-open {
+  display: flex;
+}
+
+.setup-overlay .modal-form {
   width: min(470px, calc(100vw - 40px));
   border: 1px solid #c5cdd6;
   border-radius: 6px;
-  padding: 0;
+  background: #ffffff;
   box-shadow: 0 22px 58px rgba(31, 35, 40, 0.25);
-}
-
-dialog::backdrop {
-  background: rgba(31, 35, 40, 0.38);
 }
 
 .modal-form {
