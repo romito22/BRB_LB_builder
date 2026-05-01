@@ -9,44 +9,57 @@
 <body>
   <div class="app-shell">
     <header class="top-toolbar">
-      <h1>BRB_LB Builder</h1>
+      <div class="brand-wrap">
+        <img src="BRB_LB_builder/assets/logo_brb.png" alt="BRB LB" class="logo" onerror="this.style.display='none'" />
+        <h1>BRB_LB Builder</h1>
+      </div>
       <div class="toolbar-actions">
         <button id="newProjectBtn">New Project</button>
       </div>
     </header>
 
     <aside class="left-sidebar">
-      <h2>Tools</h2>
-      <button id="addColumnBtn" disabled>Add Column Element</button>
-      <p class="hint">Select a grid intersection to enable tool actions.</p>
+      <h2>Project</h2>
+      <p><strong>Name:</strong> <span id="projectNameValue">Not set</span></p>
+      <p><strong>X:</strong> <span id="xLabelsValue">-</span></p>
+      <p><strong>Y:</strong> <span id="yLabelsValue">-</span></p>
     </aside>
 
-    <main class="central-canvas" id="canvasArea">
+    <main class="central-canvas">
       <div class="empty-state" id="emptyState">Create a project to render the grid.</div>
       <div id="gridContainer"></div>
     </main>
 
     <aside class="right-properties-panel" id="propertiesPanel">
       <h2>Properties</h2>
-      <div id="propertiesEmpty">Click a grid intersection to edit properties.</div>
-      <div id="propertiesContent" class="hidden">
-        <p><strong>Location:</strong> <span id="selectedLocation"></span></p>
-        <p><strong>Element:</strong> <span id="selectedElement">None</span></p>
-      </div>
+      <div id="propertiesEmpty">Click a grid intersection to configure a column.</div>
+      <form id="columnForm" class="hidden">
+        <p><strong>Grid Point:</strong> <span id="selectedLocation"></span></p>
+        <label>Mark <input id="colMark" required /></label>
+        <label>Size <input id="colSize" required placeholder="W14x120" /></label>
+        <label>Base Level <input id="colBaseLevel" required placeholder="Level 1" /></label>
+        <label>Top Level <input id="colTopLevel" required placeholder="Level 2" /></label>
+        <label>Notes <textarea id="colNotes" rows="3" placeholder="Optional"></textarea></label>
+        <button type="submit">Save Column</button>
+      </form>
     </aside>
 
     <section class="bottom-data-preview">
-      <h2>Data Preview</h2>
+      <h2>Data Preview: Columns</h2>
       <table>
         <thead>
           <tr>
-            <th>X Label</th>
-            <th>Y Label</th>
-            <th>Element Type</th>
+            <th>ID</th>
+            <th>Grid Location</th>
+            <th>Mark</th>
+            <th>Size</th>
+            <th>Base Level</th>
+            <th>Top Level</th>
+            <th>Notes</th>
           </tr>
         </thead>
         <tbody id="dataTableBody">
-          <tr><td colspan="3">No elements added.</td></tr>
+          <tr><td colspan="7">No columns created.</td></tr>
         </tbody>
       </table>
     </section>
@@ -55,21 +68,10 @@
   <dialog id="projectModal">
     <form id="projectForm" method="dialog">
       <h2>Project Setup</h2>
-      <label>
-        Project name
-        <input id="projectName" type="text" required />
-      </label>
-      <label>
-        X grid labels (comma separated)
-        <input id="xLabels" type="text" placeholder="A, B, C, D" required />
-      </label>
-      <label>
-        Y grid labels (comma separated)
-        <input id="yLabels" type="text" placeholder="1, 2, 3, 4" required />
-      </label>
-      <div class="modal-actions">
-        <button type="submit">Create Grid</button>
-      </div>
+      <label>Project name <input id="projectName" type="text" required /></label>
+      <label>X grid labels (CSV) <input id="xLabels" type="text" placeholder="A,B,C,D" required /></label>
+      <label>Y grid labels (CSV) <input id="yLabels" type="text" placeholder="1,2,3,4" required /></label>
+      <div class="modal-actions"><button type="submit">Create Grid</button></div>
     </form>
   </dialog>
 
