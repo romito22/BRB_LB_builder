@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BRB_LB Builder</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-toolbar">
+      <h1>BRB_LB Builder</h1>
+      <div class="toolbar-actions">
+        <button id="newProjectBtn">New Project</button>
+      </div>
+    </header>
+
+    <aside class="left-sidebar">
+      <h2>Tools</h2>
+      <button id="addColumnBtn" disabled>Add Column Element</button>
+      <p class="hint">Select a grid intersection to enable tool actions.</p>
+    </aside>
+
+    <main class="central-canvas" id="canvasArea">
+      <div class="empty-state" id="emptyState">Create a project to render the grid.</div>
+      <div id="gridContainer"></div>
+    </main>
+
+    <aside class="right-properties-panel" id="propertiesPanel">
+      <h2>Properties</h2>
+      <div id="propertiesEmpty">Click a grid intersection to edit properties.</div>
+      <div id="propertiesContent" class="hidden">
+        <p><strong>Location:</strong> <span id="selectedLocation"></span></p>
+        <p><strong>Element:</strong> <span id="selectedElement">None</span></p>
+      </div>
+    </aside>
+
+    <section class="bottom-data-preview">
+      <h2>Data Preview</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>X Label</th>
+            <th>Y Label</th>
+            <th>Element Type</th>
+          </tr>
+        </thead>
+        <tbody id="dataTableBody">
+          <tr><td colspan="3">No elements added.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <dialog id="projectModal">
+    <form id="projectForm" method="dialog">
+      <h2>Project Setup</h2>
+      <label>
+        Project name
+        <input id="projectName" type="text" required />
+      </label>
+      <label>
+        X grid labels (comma separated)
+        <input id="xLabels" type="text" placeholder="A, B, C, D" required />
+      </label>
+      <label>
+        Y grid labels (comma separated)
+        <input id="yLabels" type="text" placeholder="1, 2, 3, 4" required />
+      </label>
+      <div class="modal-actions">
+        <button type="submit">Create Grid</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
