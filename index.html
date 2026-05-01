@@ -10,7 +10,8 @@
   <div class="app-shell">
     <header class="top-toolbar">
       <div class="brand-wrap">
-        <img src="BRB_LB_builder/assets/logo_brb.png" alt="BRB LB" class="logo" onerror="this.style.display='none'" />
+        <img src="assets/logo_brb.png" alt="BRB LB" class="logo" onerror="document.getElementById('logoFallback').style.display='inline';this.style.display='none'" />
+        <span id="logoFallback" class="logo-fallback hidden">BRB</span>
         <h1>BRB_LB Builder</h1>
       </div>
       <div class="toolbar-actions">
