@@ -1,0 +1,28 @@
+.canvas-stage {
+  background:
+    linear-gradient(#edf1f5 1px, transparent 1px),
+    linear-gradient(90deg, #edf1f5 1px, transparent 1px),
+    #f6f8fa;
+  background-size: 20px 20px;
+}
+
+.drawing-sheet {
+  fill: #fbfdff;
+}
+
+.sheet-grid-fill {
+  fill: url(#draftingGrid);
+  pointer-events: none;
+}
+
+.sheet-grid-minor {
+  fill: none;
+  stroke: #edf1f5;
+  stroke-width: 0.8;
+}
+
+.sheet-grid-major {
+  fill: none;
+  stroke: #dfe5ec;
+  stroke-width: 1;
+}
