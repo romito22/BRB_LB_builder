@@ -3,9 +3,12 @@
   const GUSSET_ASSET = 'assets/gusset_normal.svg';
   const GRID_MARK_ASSET = 'assets/grid_mark.svg';
   const LEVEL_MARK_ASSET = 'assets/level_mark.svg';
-  const BRACE_VIEWBOX = { width: 11.58579, height: 202.38155, topPin: 13.45, bottomPin: 188.95 };
+  const BRACE_VIEWBOX = { width: 10.185796, height: 205.07343, topPin: 24.45, bottomPin: 180.62 };
   const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
   const GUSSET_SIZE = 76;
+  const GUSSET_HOST_OFFSET = 32;
+  const GUSSET_PIN_LOCAL = { x: 50, y: -38 };
+  const originalSetPlacementMode = setPlacementMode;
   const originalPropertiesTemplate = propertiesTemplate;
 
   getElementStartEnd = function getElementStartEndOverride(element) {
@@ -15,10 +18,16 @@
       }
       return [pointForColumnLevel(element, element.baseLevel), pointForColumnLevel(element, element.topLevel)];
     }
-    if (element.type === 'beam' || element.type === 'brb') {
+    if (element.type === 'beam') {
       return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
     }
-    const point = getPointById(element.attachedGridPointId);
+    if (element.type === 'brb') {
+      if (element.startGussetId || element.endGussetId) {
+        return [getGussetPinPoint(element.startGussetId), getGussetPinPoint(element.endGussetId)];
+      }
+      return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
+    }
+    const point = getGussetPinPoint(element.id) || getPointById(element.attachedGridPointId);
     return [point, point];
   };
 
@@ -149,7 +158,7 @@
   };
 
   renderPlacementPreview = function renderPlacementPreviewOverride(svg) {
-    if (!state.pendingStartPointId || !['column', 'beam', 'brb'].includes(state.placementMode)) return;
+    if (!state.pendingStartPointId || !['column', 'beam'].includes(state.placementMode)) return;
     const start = getPointById(state.pendingStartPointId);
     if (!start) return;
     const end = state.snapPointId ? getPointById(state.snapPointId) : state.pointerSvgPoint;
@@ -234,6 +243,26 @@
     return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
   }
 
+  function unitVector(from, to) {
+    const length = distanceToPoint(from, to);
+    if (!length) return { x: 1, y: 0 };
+    return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
+  }
+
+  function rotateLocal(point, angle, side = 1) {
+    const y = point.y * side;
+    return {
+      x: Math.cos(angle) * point.x - Math.sin(angle) * y,
+      y: Math.sin(angle) * point.x + Math.cos(angle) * y,
+    };
+  }
+
+  function hostEndpointForPoint(host, svgPoint) {
+    const [start, end] = getElementStartEnd(host);
+    if (!start || !end) return null;
+    return distanceToPoint(start, svgPoint) <= distanceToPoint(end, svgPoint) ? start : end;
+  }
+
   function normalSideTowardFrame(point, angle) {
     const center = frameCenterPoint();
     const toCenter = { x: center.x - point.x, y: center.y - point.y };
@@ -242,18 +271,36 @@
   }
 
   function gussetPlacementFor(element, point) {
-    const brb = state.elements.find(item => item.id === element.attachedToElementId && item.type === 'brb');
-    if (brb) {
-      const [start, end] = getElementStartEnd(brb);
-      if (start && end) {
-        const other = point.id === start.id ? end : start;
-        const angle = getAngle(point, other);
-        return { angle, side: normalSideTowardFrame(point, angle) };
-      }
-    }
+    const node = getPointById(element.attachedGridPointId) || point;
     const center = frameCenterPoint();
-    const angle = getAngle(point, center);
-    return { angle, side: normalSideTowardFrame(point, angle) };
+    const inward = unitVector(node, center);
+    const corner = {
+      x: node.x + inward.x * GUSSET_HOST_OFFSET,
+      y: node.y + inward.y * GUSSET_HOST_OFFSET,
+    };
+    const angle = getAngle(corner, center);
+    return { corner, angle, side: normalSideTowardFrame(corner, angle) };
+  }
+
+  setPlacementMode = function setPlacementModeOverride(mode) {
+    state.pendingStartGussetId = null;
+    originalSetPlacementMode(mode);
+  };
+
+  function getGussetPinPoint(gussetOrId) {
+    const element = typeof gussetOrId === 'string'
+      ? state.elements.find(item => item.id === gussetOrId)
+      : gussetOrId;
+    if (!element || element.type !== 'gusset') return null;
+    const node = getPointById(element.attachedGridPointId);
+    if (!node) return null;
+    const placement = gussetPlacementFor(element, node);
+    const pin = rotateLocal(GUSSET_PIN_LOCAL, placement.angle, placement.side);
+    return {
+      id: element.id,
+      x: placement.corner.x + pin.x,
+      y: placement.corner.y + pin.y,
+    };
   }
 
   BRBSymbol = function BRBSymbolAssetOverride(element) {
@@ -287,22 +334,122 @@
   };
 
   GussetPlateSymbol = function GussetPlateSymbolAssetOverride(element) {
-    const point = getPointById(element.attachedGridPointId);
+    const node = getPointById(element.attachedGridPointId);
     const group = createSvg('g', { class: `element gusset-element${elementClass(element)}`, 'data-id': element.id });
-    if (!point) return group;
-    const { angle, side } = gussetPlacementFor(element, point);
+    if (!node) return group;
+    const { corner, angle, side } = gussetPlacementFor(element, node);
+    const pinPoint = getGussetPinPoint(element);
     append(
       group,
-      GussetAssetSymbol(point, angle, side),
-      Centerline(point, getOffsetPoint(point, angle, 62)),
-      BoltPattern(getOffsetPoint(point, angle, 35), angle, Number(element.boltQuantity) || 6, 9),
-      createSvg('circle', { cx: point.x, cy: point.y, r: 4, class: 'bolt' }),
+      GussetAssetSymbol(corner, angle, side),
+      pinPoint ? Centerline(node, pinPoint) : null,
+      pinPoint ? BoltPattern(pinPoint, angle, Number(element.boltQuantity) || 6, 9) : null,
+      pinPoint ? createSvg('circle', { cx: pinPoint.x, cy: pinPoint.y, r: 4, class: 'bolt' }) : null,
     );
-    const labelPoint = getOffsetPoint(point, angle, 32);
+    const labelPoint = pinPoint || getOffsetPoint(corner, angle, 32);
     append(group, labelTag(labelPoint.x + 10, labelPoint.y - 20, element.mark));
     attachElementEvents(group, element);
     return group;
   };
+
+  function createGussetOnHost(host, svgPoint) {
+    if (!host || !['beam', 'column'].includes(host.type)) return;
+    const endpoint = hostEndpointForPoint(host, svgPoint);
+    if (!endpoint) return;
+    const element = {
+      id: nextElementId('gusset'),
+      type: 'gusset',
+      mark: nextMark('gusset'),
+      attachedGridPointId: endpoint.id,
+      hostElementId: host.id,
+      attachedToElementId: '',
+      thickness: '3/4"',
+      width: '18"',
+      height: '24"',
+      boltDiameter: '7/8"',
+      boltQuantity: 6,
+      notes: '',
+    };
+    state.elements.push(element);
+    state.selectedElementId = element.id;
+    state.placementMode = 'select';
+    state.pendingStartGussetId = null;
+  }
+
+  function createBrbBetweenGussets(startGussetId, endGussetId) {
+    if (!startGussetId || !endGussetId || startGussetId === endGussetId) return;
+    const startGusset = state.elements.find(item => item.id === startGussetId && item.type === 'gusset');
+    const endGusset = state.elements.find(item => item.id === endGussetId && item.type === 'gusset');
+    if (!startGusset || !endGusset) return;
+    const element = {
+      id: nextElementId('brb'),
+      type: 'brb',
+      mark: nextMark('brb'),
+      frameName: 'BRBF-1',
+      coreArea: '4.5 in2',
+      braceSize: '',
+      startGridPointId: startGusset.attachedGridPointId,
+      endGridPointId: endGusset.attachedGridPointId,
+      startGussetId,
+      endGussetId,
+      level: defaultLevel(),
+      notes: '',
+    };
+    state.elements.push(element);
+    startGusset.attachedToElementId = element.id;
+    endGusset.attachedToElementId = element.id;
+    state.selectedElementId = element.id;
+    state.pendingStartGussetId = null;
+    state.placementMode = 'select';
+  }
+
+  function handleGussetForBrace(gussetId) {
+    if (!state.pendingStartGussetId) {
+      state.pendingStartGussetId = gussetId;
+      state.selectedElementId = gussetId;
+      render();
+      return;
+    }
+    createBrbBetweenGussets(state.pendingStartGussetId, gussetId);
+    render();
+  }
+
+  function findNearestGussetPin(svgPoint, maxDistance = SNAP_DISTANCE) {
+    let best = null;
+    let bestDistance = Infinity;
+    state.elements.filter(element => element.type === 'gusset').forEach(gusset => {
+      const point = getGussetPinPoint(gusset);
+      if (!point) return;
+      const distance = distanceToPoint(point, svgPoint);
+      if (distance < bestDistance) {
+        best = { gusset, point };
+        bestDistance = distance;
+      }
+    });
+    return bestDistance <= maxDistance ? best : null;
+  }
+
+  function attachBrbEndpointToGusset(element, gusset, handle) {
+    if (!element || element.type !== 'brb' || !gusset) return;
+    if (handle === 'end') {
+      if (element.startGussetId === gusset.id) return;
+      element.endGussetId = gusset.id;
+      element.endGridPointId = gusset.attachedGridPointId;
+    } else {
+      if (element.endGussetId === gusset.id) return;
+      element.startGussetId = gusset.id;
+      element.startGridPointId = gusset.attachedGridPointId;
+    }
+    state.elements.forEach(item => {
+      if (item.type === 'gusset' && item.attachedToElementId === element.id && item.id !== element.startGussetId && item.id !== element.endGussetId) {
+        item.attachedToElementId = '';
+      }
+    });
+    const start = state.elements.find(item => item.id === element.startGussetId);
+    const end = state.elements.find(item => item.id === element.endGussetId);
+    if (start) start.attachedToElementId = element.id;
+    if (end) end.attachedToElementId = element.id;
+  }
 
   function beginElementDrag(event, elementId, handle = 'body') {
     if (state.placementMode !== 'select') return;
@@ -404,10 +551,13 @@
     if (!element) return;
     const svgPoint = eventToSvgPoint(event);
     state.pointerSvgPoint = svgPoint;
-    state.snapPointId = findNearestGridPoint(svgPoint, SNAP_DISTANCE)?.id || null;
+    const isBrbEndpointDrag = element.type === 'brb' && state.drag.handle !== 'body' && (element.startGussetId || element.endGussetId);
+    const nearestGusset = isBrbEndpointDrag ? findNearestGussetPin(svgPoint, SNAP_DISTANCE) : null;
+    state.snapPointId = isBrbEndpointDrag ? null : findNearestGridPoint(svgPoint, SNAP_DISTANCE)?.id || null;
     const distance = Math.hypot(svgPoint.x - state.drag.startSvgPoint.x, svgPoint.y - state.drag.startSvgPoint.y);
     state.drag.didMove = state.drag.didMove || distance > 3;
-    if (state.drag.handle === 'body') dragBodyTo(element, svgPoint);
+    if (nearestGusset) attachBrbEndpointToGusset(element, nearestGusset.gusset, state.drag.handle);
+    else if (state.drag.handle === 'body') dragBodyTo(element, svgPoint);
     else if (state.snapPointId) dragEndpointTo(element, getPointById(state.snapPointId));
     renderCanvas();
     renderTable();
@@ -431,12 +581,7 @@
   }
 
   handleGridPointClick = function handleGridPointClickOverride(pointId) {
-    if (state.placementMode === 'gusset') {
-      const brbHit = nearestBrbEndpoint(null, getPointById(pointId), 18);
-      createGusset(pointId, brbHit?.elementId || '');
-      return render();
-    }
-    if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'brb') {
+    if (state.placementMode === 'column' || state.placementMode === 'beam') {
       if (!state.pendingStartPointId) {
         state.pendingStartPointId = pointId;
         state.snapPointId = pointId;
@@ -445,7 +590,6 @@
       if (state.pendingStartPointId === pointId) return;
       if (state.placementMode === 'column') createColumn(state.pendingStartPointId, pointId);
       if (state.placementMode === 'beam') createBeam(state.pendingStartPointId, pointId);
-      if (state.placementMode === 'brb') createBrb(state.pendingStartPointId, pointId);
       state.pendingStartPointId = null;
       state.placementMode = 'select';
       return render();
@@ -462,11 +606,12 @@
     }
     if (event.target.closest?.('.element')) return;
     const svgPoint = eventToSvgPoint(event);
-    if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'brb' || state.placementMode === 'gusset') {
+    if (state.placementMode === 'column' || state.placementMode === 'beam') {
       const nearest = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
       if (nearest) handleGridPointClick(nearest.id);
       return;
     }
+    if (state.placementMode === 'gusset' || state.placementMode === 'brb') return;
     if (state.placementMode === 'select') setSelectedElement(null);
   };
 
@@ -475,13 +620,17 @@
     node.addEventListener('pointerdown', event => beginElementDrag(event, element.id, 'body'));
     node.addEventListener('click', event => {
       event.stopPropagation();
+      const svgPoint = eventToSvgPoint(event);
       if (state.justDragged) {
         state.justDragged = false;
         return;
       }
-      if (state.placementMode === 'gusset' && element.type === 'brb') {
-        const point = nearestBrbEndpoint(element, eventToSvgPoint(event));
-        if (point) createGusset(point.id, element.id);
+      if (state.placementMode === 'gusset') {
+        if (element.type === 'beam' || element.type === 'column') createGussetOnHost(element, svgPoint);
+        return render();
+      }
+      if (state.placementMode === 'brb') {
+        if (element.type === 'gusset') handleGussetForBrace(element.id);
         return render();
       }
       setSelectedElement(element.id);
@@ -530,8 +679,8 @@
     if (mode === 'select') els.modeHint.textContent = 'Select an element to edit its properties.';
     if (mode === 'column') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Column.' : 'Click the start grid point for the column.';
     if (mode === 'beam') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Beam.' : 'Click the start grid point for the beam.';
-    if (mode === 'brb') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for BRB.' : 'Click the start grid point for the BRB.';
-    if (mode === 'gusset') els.modeHint.textContent = 'Click a BRB endpoint or grid point to place a gusset plate.';
+    if (mode === 'brb') els.modeHint.textContent = state.pendingStartGussetId ? 'Click the second gusset plate for the BRB.' : 'Click the first gusset plate for the BRB.';
+    if (mode === 'gusset') els.modeHint.textContent = 'Click a beam or column host near the end where the gusset belongs.';
   };
 
   createProject = function createProjectOverride(event) {
