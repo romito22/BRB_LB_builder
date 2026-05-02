@@ -41,6 +41,19 @@
     return projectStoryHeightFt() * PIXELS_PER_FOOT;
   }
 
+  function formatFeet(value) {
+    const rounded = Math.round(value * 100) / 100;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  function frameWidthFt() {
+    return Math.max(0, (state.project?.xGridLabels?.length || 1) - 1) * projectBayWidthFt();
+  }
+
+  function frameHeightFt() {
+    return Math.max(0, (verticalLabels().length || 1) - 1) * projectStoryHeightFt();
+  }
+
   canvasSize = function canvasSizeOverride() {
     return {
       width: projectCanvasWidthFt() * PIXELS_PER_FOOT,
@@ -221,13 +234,26 @@
     renderSheetBackground(svg, size);
     renderGrid(svg, minX, minY, maxX, maxY);
     renderDimensions(svg, minX, minY, maxX, maxY);
+    state.elements.filter(element => element.type === 'column').forEach(element => svg.appendChild(ColumnSymbol(element)));
     state.elements.filter(element => element.type === 'beam').forEach(element => svg.appendChild(BeamSymbol(element)));
     state.elements.filter(element => element.type === 'brb').forEach(element => svg.appendChild(BRBSymbol(element)));
-    state.elements.filter(element => element.type === 'column').forEach(element => svg.appendChild(ColumnSymbol(element)));
     state.elements.filter(element => element.type === 'gusset').forEach(element => svg.appendChild(GussetPlateSymbol(element)));
     renderSelection(svg);
     renderGridPoints(svg);
     renderPlacementPreview(svg);
+  };
+
+  renderDimensions = function renderDimensionsOverride(svg, minX, minY, maxX, maxY) {
+    const bottomY = maxY + 116;
+    const rightX = maxX + 86;
+    append(svg,
+      createSvg('line', { x1: minX, y1: maxY + 24, x2: minX, y2: bottomY + 10, class: 'extension-line' }),
+      createSvg('line', { x1: maxX, y1: maxY + 24, x2: maxX, y2: bottomY + 10, class: 'extension-line' }),
+      DimensionLine({ x: minX, y: bottomY }, { x: maxX, y: bottomY }, `Frame Width ${formatFeet(frameWidthFt())} ft`),
+      createSvg('line', { x1: maxX + 24, y1: minY, x2: rightX + 10, y2: minY, class: 'extension-line' }),
+      createSvg('line', { x1: maxX + 24, y1: maxY, x2: rightX + 10, y2: maxY, class: 'extension-line' }),
+      DimensionLine({ x: rightX, y: minY }, { x: rightX, y: maxY }, `Frame Height ${formatFeet(frameHeightFt())} ft`, 'right'),
+    );
   };
 
   function MarkAsset(href, x, y, width, height, transform = '') {
@@ -270,6 +296,24 @@
       renderMarkerText(svg, x, minY - 82, label, 'grid-name-label');
     });
     append(svg, createSvg('line', { x1: 52, y1: maxY + 104, x2: maxX + 116, y2: maxY + 104, class: 'sheet-title-line' }));
+  };
+
+  MemberStickSymbol = function MemberStickSymbolOverride(start, end, width, className) {
+    const group = createSvg('g', { class: className });
+    const normal = getNormalOffset(start, end, width / 2);
+    const points = [
+      `${start.x + normal.x},${start.y + normal.y}`,
+      `${end.x + normal.x},${end.y + normal.y}`,
+      `${end.x - normal.x},${end.y - normal.y}`,
+      `${start.x - normal.x},${start.y - normal.y}`,
+    ].join(' ');
+    append(group,
+      createSvg('polygon', { points, class: 'member-body' }),
+      createSvg('line', { x1: start.x + normal.x, y1: start.y + normal.y, x2: end.x + normal.x, y2: end.y + normal.y, class: 'member-edge' }),
+      createSvg('line', { x1: start.x - normal.x, y1: start.y - normal.y, x2: end.x - normal.x, y2: end.y - normal.y, class: 'member-edge' }),
+      Centerline(start, end, 'member-centerline'),
+    );
+    return group;
   };
 
   renderPlacementPreview = function renderPlacementPreviewOverride(svg) {
@@ -419,7 +463,7 @@
   updateProjectInfo = function updateProjectInfoOverride() {
     originalUpdateProjectInfo();
     if (!state.project) return;
-    els.projectMeta.textContent = `${state.project.name} - ${projectCanvasWidthFt()}ft x ${projectCanvasHeightFt()}ft canvas, ${projectBayWidthFt()}ft bays`;
+    els.projectMeta.textContent = `${state.project.name} - ${projectCanvasWidthFt()}ft x ${projectCanvasHeightFt()}ft canvas, ${projectBayWidthFt()}ft bays, ${projectStoryHeightFt()}ft stories`;
   };
 
   function getGussetPinPoint(gussetOrId) {
@@ -453,6 +497,10 @@
   createColumn = function createColumnOverride(startGridPointId, endGridPointId) {
     const start = getPointById(startGridPointId);
     const end = getPointById(endGridPointId);
+    if (!start || !end || Math.abs(start.x - end.x) > 0.1 || Math.abs(start.y - end.y) < 0.1) {
+      els.modeHint.textContent = 'Column needs two different points on the same vertical gridline.';
+      return null;
+    }
     const element = {
       id: nextElementId('column'),
       type: 'column',
@@ -466,6 +514,30 @@
     };
     state.elements.push(element);
     state.selectedElementId = element.id;
+    return element;
+  };
+
+  createBeam = function createBeamOverride(startGridPointId, endGridPointId) {
+    const start = getPointById(startGridPointId);
+    const end = getPointById(endGridPointId);
+    if (!start || !end || Math.abs(start.y - end.y) > 0.1 || Math.abs(start.x - end.x) < 0.1) {
+      els.modeHint.textContent = 'Beam needs two different points on the same level.';
+      return null;
+    }
+    const element = {
+      id: nextElementId('beam'),
+      type: 'beam',
+      mark: nextMark('beam'),
+      size: 'W24x131',
+      startGridPointId,
+      endGridPointId,
+      level: start.yLabel || end.yLabel || defaultLevel(true),
+      connectionType: 'Shear',
+      notes: '',
+    };
+    state.elements.push(element);
+    state.selectedElementId = element.id;
+    return element;
   };
 
   GussetPlateSymbol = function GussetPlateSymbolAssetOverride(element) {
@@ -735,8 +807,13 @@
         return render();
       }
       if (state.pendingStartPointId === pointId) return;
-      if (state.placementMode === 'column') createColumn(state.pendingStartPointId, pointId);
-      if (state.placementMode === 'beam') createBeam(state.pendingStartPointId, pointId);
+      const created = state.placementMode === 'column'
+        ? createColumn(state.pendingStartPointId, pointId)
+        : createBeam(state.pendingStartPointId, pointId);
+      if (!created) {
+        state.snapPointId = pointId;
+        return render();
+      }
       state.pendingStartPointId = null;
       state.placementMode = 'select';
       return render();
