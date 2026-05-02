@@ -10,7 +10,6 @@
   const BRACE_VIEWBOX = { width: 26.286751, height: 205.07343, topPin: 24.45, bottomPin: 180.62 };
   const BASE_PLATE_VIEWBOX = { width: 45.786118, height: 3.8827007 };
   const FOOTING_VIEWBOX = { width: 45.786095, height: 3.7401545 };
-  const SLAB_VIEWBOX = { width: 45.786095, height: 3.7401545 };
   const WORK_POINT_VIEWBOX = { width: 1.9726186, height: 1.9416088 };
   const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
   const GUSSET_SIZE = 96;
@@ -19,6 +18,7 @@
   const GUSSET_LONG_LEG = 96;
   const GUSSET_HOST_OFFSET = 32;
   const GUSSET_PIN_LOCAL = { x: 50, y: -38 };
+  const SLAB_RENDER_HEIGHT = 18;
   const originalSetPlacementMode = setPlacementMode;
   const originalPropertiesTemplate = propertiesTemplate;
   const originalNextElementId = nextElementId;
@@ -639,6 +639,30 @@
     return group;
   }
 
+  function SlabAssetSymbol(start, end) {
+    const length = distanceToPoint(start, end);
+    if (!length) return null;
+    const angleDeg = getAngle(start, end) * 180 / Math.PI;
+    const height = SLAB_RENDER_HEIGHT;
+    const group = createSvg('g', {
+      class: 'slab-asset-wrap',
+      transform: `translate(${start.x} ${start.y}) rotate(${angleDeg})`,
+    });
+    append(group,
+      createSvg('rect', { x: 0, y: -height / 2, width: length, height, class: 'slab-body' }),
+      createSvg('line', { x1: 0, y1: 0, x2: length, y2: 0, class: 'member-centerline' }),
+      assetImage(SLAB_ASSET, {
+        x: 0,
+        y: -height / 2,
+        width: length,
+        height,
+        preserveAspectRatio: 'none',
+        class: 'slab-asset',
+      }),
+    );
+    return group;
+  }
+
   function WorkPointAssetSymbol(point) {
     const radius = 7;
     const assetSize = 16;
@@ -968,9 +992,9 @@
     const [start, end] = getElementStartEnd(element);
     const group = createSvg('g', { class: `element slab-element${elementClass(element)}`, 'data-id': element.id });
     if (!start || !end) return group;
-    append(group, LinearConcreteAssetSymbol(start, end, SLAB_ASSET, SLAB_VIEWBOX, 'slab'));
+    append(group, SlabAssetSymbol(start, end));
     const mid = getMidpoint(start, end);
-    append(group, labelTag(mid.x, mid.y - 18, element.mark, 'middle'));
+    append(group, labelTag(mid.x, mid.y - 22, element.mark, 'middle'));
     attachElementEvents(group, element);
     return group;
   }
@@ -1006,8 +1030,8 @@
   function createSlab(startGridPointId, endGridPointId) {
     const start = getPointById(startGridPointId);
     const end = getPointById(endGridPointId);
-    if (!start || !end || startGridPointId === endGridPointId) {
-      els.modeHint.textContent = 'Slab needs two different grid points.';
+    if (!start || !end || Math.abs(start.y - end.y) > 0.1 || Math.abs(start.x - end.x) < 0.1) {
+      els.modeHint.textContent = 'Slab needs two different points on the same level.';
       return null;
     }
     const count = state.elements.filter(element => element.type === 'slab').length + 1;
