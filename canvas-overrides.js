@@ -2,11 +2,15 @@
   const BRACE_ASSET = 'assets/brace.svg';
   const GUSSET_ASSET = 'assets/gusset_normal.svg';
   const BASE_PLATE_ASSET = 'assets/base_plate.svg';
+  const FOOTING_ASSET = 'assets/footing.svg';
+  const SLAB_ASSET = 'assets/slab_conc.svg';
   const WORK_POINT_ASSET = 'assets/work_point.svg';
   const GRID_MARK_ASSET = 'assets/grid_mark.svg';
   const LEVEL_MARK_ASSET = 'assets/level_mark.svg';
   const BRACE_VIEWBOX = { width: 26.286751, height: 205.07343, topPin: 24.45, bottomPin: 180.62 };
   const BASE_PLATE_VIEWBOX = { width: 45.786118, height: 3.8827007 };
+  const FOOTING_VIEWBOX = { width: 45.786095, height: 3.7401545 };
+  const SLAB_VIEWBOX = { width: 45.786095, height: 3.7401545 };
   const WORK_POINT_VIEWBOX = { width: 1.9726186, height: 1.9416088 };
   const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
   const GUSSET_SIZE = 96;
@@ -283,7 +287,7 @@
   };
 
   function isPointElement(element) {
-    return ['gusset', 'basePlate', 'workPoint'].includes(element?.type);
+    return ['gusset', 'basePlate', 'footing', 'workPoint'].includes(element?.type);
   }
 
   SelectionHandles = function SelectionHandlesOverride(element) {
@@ -320,6 +324,9 @@
     }
     if (element.type === 'basePlate') {
       return createSvg('rect', { x: start.x - 58, y: start.y - 18, width: 116, height: 36, class: 'selection-outline' });
+    }
+    if (element.type === 'footing') {
+      return createSvg('rect', { x: start.x - 64, y: start.y - 18, width: 128, height: 36, class: 'selection-outline' });
     }
     if (element.type === 'workPoint') {
       return createSvg('circle', { cx: start.x, cy: start.y, r: 18, class: 'selection-outline' });
@@ -368,6 +375,8 @@
     state.elements.filter(element => element.type === 'beam').forEach(element => svg.appendChild(BeamSymbol(element)));
     state.elements.filter(element => element.type === 'brb').forEach(element => svg.appendChild(BRBSymbol(element)));
     state.elements.filter(element => element.type === 'gusset').forEach(element => svg.appendChild(GussetPlateSymbol(element)));
+    state.elements.filter(element => element.type === 'slab').forEach(element => svg.appendChild(SlabSymbol(element)));
+    state.elements.filter(element => element.type === 'footing').forEach(element => svg.appendChild(FootingSymbol(element)));
     state.elements.filter(element => element.type === 'basePlate').forEach(element => svg.appendChild(BasePlateSymbol(element)));
     state.elements.filter(element => element.type === 'workPoint').forEach(element => svg.appendChild(WorkPointSymbol(element)));
     renderSelection(svg);
@@ -449,13 +458,13 @@
   };
 
   renderPlacementPreview = function renderPlacementPreviewOverride(svg) {
-    if (!state.pendingStartPointId || !['column', 'beam'].includes(state.placementMode)) return;
+    if (!state.pendingStartPointId || !['column', 'beam', 'slab'].includes(state.placementMode)) return;
     const start = getPointById(state.pendingStartPointId);
     if (!start) return;
     const end = state.snapPointId ? getPointById(state.snapPointId) : state.pointerSvgPoint;
     if (!end) return;
     append(svg, createSvg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: 'placement-preview' }));
-    const toolName = { column: 'Column', beam: 'Beam', brb: 'BRB' }[state.placementMode];
+    const toolName = { column: 'Column', beam: 'Beam', slab: 'Slab', brb: 'BRB' }[state.placementMode];
     const text = `Select end point for ${toolName}`;
     const group = createSvg('g', { class: 'instruction-banner' });
     append(group, createSvg('rect', { x: start.x + 18, y: start.y - 42, width: 188, height: 26 }));
@@ -542,6 +551,47 @@
         height,
         preserveAspectRatio: 'none',
         class: 'base-plate-asset',
+      }),
+    );
+    return group;
+  }
+
+  function FootingAssetSymbol(point) {
+    const width = 124;
+    const height = Math.max(12, width * FOOTING_VIEWBOX.height / FOOTING_VIEWBOX.width);
+    const group = createSvg('g', { class: 'footing-asset-wrap' });
+    append(group,
+      createSvg('rect', { x: point.x - width / 2, y: point.y - height / 2, width, height, class: 'footing-body' }),
+      assetImage(FOOTING_ASSET, {
+        x: point.x - width / 2,
+        y: point.y - height / 2,
+        width,
+        height,
+        preserveAspectRatio: 'none',
+        class: 'footing-asset',
+      }),
+    );
+    return group;
+  }
+
+  function LinearConcreteAssetSymbol(start, end, asset, viewBox, className) {
+    const length = distanceToPoint(start, end);
+    if (!length) return null;
+    const height = Math.max(12, length * viewBox.height / viewBox.width);
+    const angleDeg = getAngle(start, end) * 180 / Math.PI;
+    const group = createSvg('g', {
+      class: `${className}-asset-wrap`,
+      transform: `translate(${start.x} ${start.y}) rotate(${angleDeg})`,
+    });
+    append(group,
+      createSvg('rect', { x: 0, y: -height / 2, width: length, height, class: `${className}-body` }),
+      assetImage(asset, {
+        x: 0,
+        y: -height / 2,
+        width: length,
+        height,
+        preserveAspectRatio: 'none',
+        class: `${className}-asset`,
       }),
     );
     return group;
@@ -863,6 +913,26 @@
     return group;
   }
 
+  function FootingSymbol(element) {
+    const point = getPointById(element.attachedGridPointId);
+    const group = createSvg('g', { class: `element footing-element${elementClass(element)}`, 'data-id': element.id });
+    if (!point) return group;
+    append(group, FootingAssetSymbol(point), labelTag(point.x + 12, point.y - 14, element.mark));
+    attachElementEvents(group, element);
+    return group;
+  }
+
+  function SlabSymbol(element) {
+    const [start, end] = getElementStartEnd(element);
+    const group = createSvg('g', { class: `element slab-element${elementClass(element)}`, 'data-id': element.id });
+    if (!start || !end) return group;
+    append(group, LinearConcreteAssetSymbol(start, end, SLAB_ASSET, SLAB_VIEWBOX, 'slab'));
+    const mid = getMidpoint(start, end);
+    append(group, labelTag(mid.x, mid.y - 18, element.mark, 'middle'));
+    attachElementEvents(group, element);
+    return group;
+  }
+
   function WorkPointSymbol(element) {
     const point = getPointById(element.attachedGridPointId);
     const group = createSvg('g', { class: `element work-point-element${elementClass(element)}`, 'data-id': element.id });
@@ -874,15 +944,39 @@
 
   function createPointElement(type, pointId) {
     const point = getPointById(pointId);
-    if (!point || !['basePlate', 'workPoint'].includes(type)) return null;
+    if (!point || !['basePlate', 'footing', 'workPoint'].includes(type)) return null;
     const count = state.elements.filter(element => element.type === type).length + 1;
     const element = {
       id: nextElementId(type),
       type,
-      mark: type === 'basePlate' ? `BP-${count}` : `WP-${count}`,
+      mark: type === 'basePlate' ? `BP-${count}` : type === 'footing' ? `FT-${count}` : `WP-${count}`,
       attachedGridPointId: point.id,
-      size: type === 'basePlate' ? 'BP 2ft-10in' : 'WP',
+      size: type === 'basePlate' ? 'BP 2ft-10in' : type === 'footing' ? 'Footing' : 'WP',
       level: point.yLabel || '',
+      notes: '',
+    };
+    state.elements.push(element);
+    state.selectedElementId = element.id;
+    state.placementMode = 'select';
+    return element;
+  }
+
+  function createSlab(startGridPointId, endGridPointId) {
+    const start = getPointById(startGridPointId);
+    const end = getPointById(endGridPointId);
+    if (!start || !end || startGridPointId === endGridPointId) {
+      els.modeHint.textContent = 'Slab needs two different grid points.';
+      return null;
+    }
+    const count = state.elements.filter(element => element.type === 'slab').length + 1;
+    const element = {
+      id: nextElementId('slab'),
+      type: 'slab',
+      mark: `S-${count}`,
+      size: 'Concrete slab',
+      startGridPointId,
+      endGridPointId,
+      level: start.yLabel === end.yLabel ? start.yLabel : `${start.yLabel || ''} to ${end.yLabel || ''}`,
       notes: '',
     };
     state.elements.push(element);
@@ -1151,8 +1245,24 @@
   }
 
   handleGridPointClick = function handleGridPointClickOverride(pointId) {
-    if (state.placementMode === 'basePlate' || state.placementMode === 'workPoint') {
+    if (state.placementMode === 'basePlate' || state.placementMode === 'footing' || state.placementMode === 'workPoint') {
       createPointElement(state.placementMode, pointId);
+      return render();
+    }
+    if (state.placementMode === 'slab') {
+      if (!state.pendingStartPointId) {
+        state.pendingStartPointId = pointId;
+        state.snapPointId = pointId;
+        return render();
+      }
+      if (state.pendingStartPointId === pointId) return;
+      const created = createSlab(state.pendingStartPointId, pointId);
+      if (!created) {
+        state.snapPointId = pointId;
+        return render();
+      }
+      state.pendingStartPointId = null;
+      state.placementMode = 'select';
       return render();
     }
     if (state.placementMode === 'column' || state.placementMode === 'beam') {
@@ -1185,7 +1295,7 @@
     }
     if (event.target.closest?.('.element')) return;
     const svgPoint = eventToSvgPoint(event);
-    if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'basePlate' || state.placementMode === 'workPoint') {
+    if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'slab' || state.placementMode === 'basePlate' || state.placementMode === 'footing' || state.placementMode === 'workPoint') {
       const nearest = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
       if (nearest) handleGridPointClick(nearest.id);
       return;
@@ -1223,7 +1333,7 @@
   };
 
   propertiesTemplate = function propertiesTemplateOverride(element) {
-    if (element.type === 'basePlate' || element.type === 'workPoint') {
+    if (element.type === 'basePlate' || element.type === 'footing' || element.type === 'workPoint') {
       const shared = `
         <div class="selection-summary"><span>${escapeHtml(element.type)}</span><strong>${escapeHtml(element.id)}</strong></div>
         <label>Mark<input name="mark" value="${escapeHtml(element.mark)}" /></label>
@@ -1232,6 +1342,21 @@
       return `${shared}
         <label>Attached Grid Point<select name="attachedGridPointId">${pointOptions(element.attachedGridPointId)}</select></label>
         <label>Size<input name="size" value="${escapeHtml(element.size || '')}" /></label>
+        ${notes}`;
+    }
+    if (element.type === 'slab') {
+      const shared = `
+        <div class="selection-summary"><span>${escapeHtml(element.type)}</span><strong>${escapeHtml(element.id)}</strong></div>
+        <label>Mark<input name="mark" value="${escapeHtml(element.mark)}" /></label>
+      `;
+      const notes = `<label>Notes<textarea name="notes" rows="4">${escapeHtml(element.notes)}</textarea></label>`;
+      return `${shared}
+        <label>Size<input name="size" value="${escapeHtml(element.size || '')}" /></label>
+        <div class="form-grid">
+          <label>Start<select name="startGridPointId">${pointOptions(element.startGridPointId)}</select></label>
+          <label>End<select name="endGridPointId">${pointOptions(element.endGridPointId)}</select></label>
+        </div>
+        <label>Level<input name="level" value="${escapeHtml(element.level || '')}" /></label>
         ${notes}`;
     }
     if (element.type !== 'column') return originalPropertiesTemplate(element);
@@ -1252,7 +1377,7 @@
 
   locationFor = function locationForOverride(element) {
     if (element.type === 'column') return element.startGridPointId ? `${element.startGridPointId} -> ${element.endGridPointId}` : element.gridPointId;
-    if (['gusset', 'basePlate', 'workPoint'].includes(element.type)) return element.attachedGridPointId;
+    if (['gusset', 'basePlate', 'footing', 'workPoint'].includes(element.type)) return element.attachedGridPointId;
     return `${element.startGridPointId} -> ${element.endGridPointId}`;
   };
 
@@ -1265,7 +1390,7 @@
       return `${element.baseLevel} to ${element.topLevel}`;
     }
     if (element.type === 'gusset') return '';
-    if (element.type === 'basePlate' || element.type === 'workPoint') {
+    if (element.type === 'basePlate' || element.type === 'footing' || element.type === 'workPoint') {
       return getPointById(element.attachedGridPointId)?.yLabel || element.level || '';
     }
     return element.level;
@@ -1276,9 +1401,11 @@
     if (mode === 'select') els.modeHint.textContent = 'Select an element to edit its properties.';
     if (mode === 'column') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Column.' : 'Click the start grid point for the column.';
     if (mode === 'beam') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Beam.' : 'Click the start grid point for the beam.';
+    if (mode === 'slab') els.modeHint.textContent = state.pendingStartPointId ? 'Select end grid point for Slab.' : 'Click the start grid point for the slab.';
     if (mode === 'brb') els.modeHint.textContent = state.pendingStartGussetId ? 'Click the second gusset plate for the BRB.' : 'Click the first gusset plate for the BRB.';
     if (mode === 'gusset') els.modeHint.textContent = 'Click a beam or column host near the end where the gusset belongs.';
     if (mode === 'basePlate') els.modeHint.textContent = 'Click one grid point to place a base plate.';
+    if (mode === 'footing') els.modeHint.textContent = 'Click one grid point to place a footing.';
     if (mode === 'workPoint') els.modeHint.textContent = 'Click one grid point to place a work point.';
   };
 

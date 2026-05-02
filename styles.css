@@ -23,6 +23,8 @@
   --brace-fill: rgba(254, 215, 170, 0.34);
   --gusset-fill: rgba(221, 214, 254, 0.38);
   --base-plate-fill: rgba(253, 230, 138, 0.34);
+  --footing-fill: rgba(203, 213, 225, 0.36);
+  --slab-fill: rgba(209, 250, 229, 0.3);
   --work-point-fill: rgba(248, 113, 113, 0.3);
   --pin-fill: rgba(255, 255, 255, 0.88);
   color: #20242a;
@@ -55,6 +57,8 @@ body.theme-dark {
   --brace-fill: rgba(251, 191, 36, 0.18);
   --gusset-fill: rgba(196, 181, 253, 0.24);
   --base-plate-fill: rgba(250, 204, 21, 0.2);
+  --footing-fill: rgba(148, 163, 184, 0.24);
+  --slab-fill: rgba(110, 231, 183, 0.18);
   --work-point-fill: rgba(248, 113, 113, 0.22);
   --pin-fill: rgba(15, 23, 42, 0.92);
 }
@@ -344,6 +348,21 @@ h2 {
   content: "";
 }
 
+.library-symbol.footing::before,
+.library-symbol.slab::before {
+  position: absolute;
+  left: 2px;
+  top: 12px;
+  width: 27px;
+  height: 8px;
+  background: url("assets/footing.svg") center / contain no-repeat;
+  content: "";
+}
+
+.library-symbol.slab::before {
+  background-image: url("assets/slab_conc.svg");
+}
+
 .library-symbol.work-point::before {
   position: absolute;
   left: 9px;
@@ -400,6 +419,8 @@ h2 {
 .color-chip.brb { background: rgba(254, 215, 170, 0.34); }
 .color-chip.gusset { background: rgba(221, 214, 254, 0.38); }
 .color-chip.base-plate { background: rgba(253, 230, 138, 0.34); }
+.color-chip.footing { background: rgba(203, 213, 225, 0.36); }
+.color-chip.slab { background: rgba(209, 250, 229, 0.3); }
 .color-chip.work-point { background: rgba(248, 113, 113, 0.3); }
 
 .color-chip.dark {
@@ -411,6 +432,8 @@ h2 {
 .color-chip.brb.dark { background: rgba(251, 191, 36, 0.18); }
 .color-chip.gusset.dark { background: rgba(196, 181, 253, 0.24); }
 .color-chip.base-plate.dark { background: rgba(250, 204, 21, 0.2); }
+.color-chip.footing.dark { background: rgba(148, 163, 184, 0.24); }
+.color-chip.slab.dark { background: rgba(110, 231, 183, 0.18); }
 .color-chip.work-point.dark { background: rgba(248, 113, 113, 0.22); }
 
 .project-facts dt {
@@ -714,7 +737,30 @@ h2 {
   vector-effect: non-scaling-stroke;
 }
 
+.footing-body {
+  fill: var(--footing-fill);
+  stroke: var(--object-stroke);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.slab-body {
+  fill: var(--slab-fill);
+  stroke: var(--object-stroke);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
 .base-plate-asset {
+  color: var(--object-stroke);
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.footing-asset,
+.slab-asset {
   color: var(--object-stroke);
   opacity: 0.92;
   pointer-events: none;
@@ -1290,6 +1336,14 @@ body.theme-dark .base-plate-body {
   fill: var(--base-plate-fill);
 }
 
+body.theme-dark .footing-body {
+  fill: var(--footing-fill);
+}
+
+body.theme-dark .slab-body {
+  fill: var(--slab-fill);
+}
+
 body.theme-dark .work-point-body {
   fill: var(--work-point-fill);
 }
@@ -1322,10 +1376,14 @@ body.theme-dark .dimension-arrow {
 body.theme-dark .brace-asset,
 body.theme-dark .gusset-asset,
 body.theme-dark .base-plate-asset,
+body.theme-dark .footing-asset,
+body.theme-dark .slab-asset,
 body.theme-dark .work-point-asset,
 body.theme-dark .grid-mark-asset,
 body.theme-dark .library-symbol.brb::before,
 body.theme-dark .library-symbol.gusset::before,
-body.theme-dark .library-symbol.base-plate::before {
+body.theme-dark .library-symbol.base-plate::before,
+body.theme-dark .library-symbol.footing::before,
+body.theme-dark .library-symbol.slab::before {
   filter: invert(1) brightness(1.7) contrast(1.15);
 }
