@@ -45,7 +45,16 @@ function parseCsv(value) {
 }
 
 function idPrefix(type) {
-  return { column: 'COL', beam: 'BM', brb: 'BRB', gusset: 'GP' }[type];
+  return {
+    column: 'COL',
+    beam: 'BM',
+    brb: 'BRB',
+    gusset: 'GP',
+    slab: 'SLAB',
+    basePlate: 'BP',
+    footing: 'FT',
+    workPoint: 'WP',
+  }[type];
 }
 
 function nextElementId(type) {
@@ -56,7 +65,16 @@ function nextElementId(type) {
 
 function nextMark(type) {
   const count = state.elements.filter(element => element.type === type).length + 1;
-  return { column: `C${count}`, beam: `B${count}`, brb: `BRB-${count}`, gusset: `GP-${count}` }[type];
+  return {
+    column: `C${count}`,
+    beam: `B${count}`,
+    brb: `BRB-${count}`,
+    gusset: `GP-${count}`,
+    slab: `S-${count}`,
+    basePlate: `BP-${count}`,
+    footing: `FT-${count}`,
+    workPoint: `WP-${count}`,
+  }[type];
 }
 
 function gridPointId(xLabel, yLabel) {
@@ -119,7 +137,7 @@ function getElementStartEnd(element) {
     }
     return [pointForColumnLevel(element, element.baseLevel), pointForColumnLevel(element, element.topLevel)];
   }
-  if (element.type === 'beam' || element.type === 'brb') {
+  if (element.type === 'beam' || element.type === 'brb' || element.type === 'slab') {
     return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
   }
   const point = getPointById(element.attachedGridPointId);
