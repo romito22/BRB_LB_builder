@@ -1,9 +1,12 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const BAY_SPACING = 230;
-const STORY_HEIGHT = 185;
-const SHEET_PAD_X = 150;
-const SHEET_PAD_TOP = 120;
-const SHEET_PAD_BOTTOM = 155;
+const FEET_PER_CANVAS = 20;
+const PIXELS_PER_FOOT = 40;
+const CANVAS_SPAN = FEET_PER_CANVAS * PIXELS_PER_FOOT;
+const BAY_SPACING = 8 * PIXELS_PER_FOOT;
+const STORY_HEIGHT = 8 * PIXELS_PER_FOOT;
+const SHEET_PAD_X = 6 * PIXELS_PER_FOOT;
+const SHEET_PAD_TOP = 5 * PIXELS_PER_FOOT;
+const SHEET_PAD_BOTTOM = 3 * PIXELS_PER_FOOT;
 const SNAP_DISTANCE = 36;
 
 const state = {
@@ -195,11 +198,10 @@ function drawingExtents() {
 }
 
 function canvasSize() {
-  if (!state.project) return { width: 1120, height: 720 };
-  const { maxX, maxY } = drawingExtents();
+  if (!state.project) return { width: CANVAS_SPAN, height: CANVAS_SPAN };
   return {
-    width: Math.max(1120, maxX + SHEET_PAD_X + 145),
-    height: Math.max(720, maxY + SHEET_PAD_BOTTOM),
+    width: CANVAS_SPAN,
+    height: CANVAS_SPAN,
   };
 }
 

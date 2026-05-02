@@ -5,7 +5,7 @@
     linear-gradient(#edf1f5 1px, transparent 1px),
     linear-gradient(90deg, #edf1f5 1px, transparent 1px),
     #f6f8fa;
-  background-size: 20px 20px;
+  background-size: 40px 40px;
   user-select: none;
   -webkit-user-select: none;
 }

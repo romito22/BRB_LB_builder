@@ -77,13 +77,12 @@
     const defs = createSvg('defs');
     const pattern = createSvg('pattern', {
       id: 'draftingGrid',
-      width: 60,
-      height: 60,
+      width: PIXELS_PER_FOOT,
+      height: PIXELS_PER_FOOT,
       patternUnits: 'userSpaceOnUse',
     });
     append(pattern,
-      createSvg('path', { d: 'M 12 0 V 60 M 24 0 V 60 M 36 0 V 60 M 48 0 V 60 M 0 12 H 60 M 0 24 H 60 M 0 36 H 60 M 0 48 H 60', class: 'sheet-grid-minor' }),
-      createSvg('path', { d: 'M 60 0 V 60 M 0 60 H 60', class: 'sheet-grid-major' }),
+      createSvg('path', { d: `M ${PIXELS_PER_FOOT} 0 V ${PIXELS_PER_FOOT} M 0 ${PIXELS_PER_FOOT} H ${PIXELS_PER_FOOT}`, class: 'sheet-grid-major' }),
     );
     append(defs, pattern);
     append(svg, defs);
