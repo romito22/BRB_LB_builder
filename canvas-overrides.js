@@ -789,6 +789,45 @@
     event.stopPropagation();
   }, true);
 
+  function applyTheme(theme) {
+    const isDark = theme === 'dark';
+    document.body.classList.toggle('theme-dark', isDark);
+    const button = document.getElementById('themeToggleBtn');
+    const icon = document.getElementById('themeToggleIcon');
+    const label = document.getElementById('themeToggleLabel');
+    if (button) {
+      button.classList.toggle('active', isDark);
+      button.setAttribute('aria-pressed', String(isDark));
+      button.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    }
+    if (icon) icon.textContent = isDark ? 'L' : 'D';
+    if (label) label.textContent = isDark ? 'Light' : 'Dark';
+  }
+
+  function storedTheme() {
+    try {
+      return localStorage.getItem('brb-lb-theme') || 'light';
+    } catch (error) {
+      return 'light';
+    }
+  }
+
+  function setStoredTheme(theme) {
+    try {
+      localStorage.setItem('brb-lb-theme', theme);
+    } catch (error) {
+      // Local storage can be unavailable in private contexts.
+    }
+  }
+
+  document.getElementById('themeToggleBtn')?.addEventListener('click', () => {
+    const nextTheme = document.body.classList.contains('theme-dark') ? 'light' : 'dark';
+    setStoredTheme(nextTheme);
+    applyTheme(nextTheme);
+  });
+
+  applyTheme(storedTheme());
+
   initializeDefaultProject = function initializeDefaultProjectOverride() {
     setProject('BRB Frame Layout', ['A', 'B'], ['1', '2'], false);
     state.project.canvasWidthFt = FEET_PER_CANVAS;
