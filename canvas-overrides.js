@@ -1,9 +1,13 @@
 (function () {
   const BRACE_ASSET = 'assets/brace.svg';
   const GUSSET_ASSET = 'assets/gusset_normal.svg';
+  const BASE_PLATE_ASSET = 'assets/base_plate.svg';
+  const WORK_POINT_ASSET = 'assets/work_point.svg';
   const GRID_MARK_ASSET = 'assets/grid_mark.svg';
   const LEVEL_MARK_ASSET = 'assets/level_mark.svg';
   const BRACE_VIEWBOX = { width: 26.286751, height: 205.07343, topPin: 24.45, bottomPin: 180.62 };
+  const BASE_PLATE_VIEWBOX = { width: 45.786118, height: 3.8827007 };
+  const WORK_POINT_VIEWBOX = { width: 1.9726186, height: 1.9416088 };
   const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
   const GUSSET_SIZE = 96;
   const MEMBER_HALF_WIDTH = 12;
@@ -13,6 +17,12 @@
   const GUSSET_PIN_LOCAL = { x: 50, y: -38 };
   const originalSetPlacementMode = setPlacementMode;
   const originalPropertiesTemplate = propertiesTemplate;
+
+  pointOptions = function pointOptionsOverride(selected) {
+    const values = state.gridPoints.map(point => point.id);
+    if (selected && !values.includes(selected)) values.push(selected);
+    return optionList(values, selected);
+  };
 
   function clampNumber(value, min, max, fallback) {
     const number = Number(value);
@@ -165,11 +175,15 @@
     return [point, point];
   };
 
+  function isPointElement(element) {
+    return ['gusset', 'basePlate', 'workPoint'].includes(element?.type);
+  }
+
   SelectionHandles = function SelectionHandlesOverride(element) {
     const [start, end] = getElementStartEnd(element);
     if (!start) return null;
     const group = createSvg('g', { class: 'selection-handles' });
-    const handles = element.type === 'gusset'
+    const handles = isPointElement(element)
       ? [{ point: start, handle: 'point' }]
       : [
           { point: start, handle: 'start' },
@@ -196,6 +210,12 @@
     if (!start) return null;
     if (element.type === 'gusset') {
       return createSvg('circle', { cx: start.x, cy: start.y, r: 56, class: 'selection-outline' });
+    }
+    if (element.type === 'basePlate') {
+      return createSvg('rect', { x: start.x - 58, y: start.y - 18, width: 116, height: 36, class: 'selection-outline' });
+    }
+    if (element.type === 'workPoint') {
+      return createSvg('circle', { cx: start.x, cy: start.y, r: 18, class: 'selection-outline' });
     }
     const normal = getNormalOffset(start, end, 24);
     const points = [
@@ -241,6 +261,8 @@
     state.elements.filter(element => element.type === 'beam').forEach(element => svg.appendChild(BeamSymbol(element)));
     state.elements.filter(element => element.type === 'brb').forEach(element => svg.appendChild(BRBSymbol(element)));
     state.elements.filter(element => element.type === 'gusset').forEach(element => svg.appendChild(GussetPlateSymbol(element)));
+    state.elements.filter(element => element.type === 'basePlate').forEach(element => svg.appendChild(BasePlateSymbol(element)));
+    state.elements.filter(element => element.type === 'workPoint').forEach(element => svg.appendChild(WorkPointSymbol(element)));
     renderSelection(svg);
     renderGridPoints(svg);
     renderPlacementPreview(svg);
@@ -397,6 +419,44 @@
       preserveAspectRatio: 'xMinYMax meet',
       class: 'gusset-asset',
     }));
+    return group;
+  }
+
+  function BasePlateAssetSymbol(point) {
+    const width = 112;
+    const height = width * BASE_PLATE_VIEWBOX.height / BASE_PLATE_VIEWBOX.width;
+    const group = createSvg('g', { class: 'base-plate-asset-wrap' });
+    append(group,
+      createSvg('rect', { x: point.x - width / 2, y: point.y - height / 2, width, height, class: 'base-plate-body' }),
+      assetImage(BASE_PLATE_ASSET, {
+        x: point.x - width / 2,
+        y: point.y - height / 2,
+        width,
+        height,
+        preserveAspectRatio: 'none',
+        class: 'base-plate-asset',
+      }),
+    );
+    return group;
+  }
+
+  function WorkPointAssetSymbol(point) {
+    const radius = 7;
+    const assetSize = 16;
+    const group = createSvg('g', { class: 'work-point-asset-wrap' });
+    append(group,
+      createSvg('circle', { cx: point.x, cy: point.y, r: radius, class: 'work-point-body' }),
+      createSvg('line', { x1: point.x - radius - 5, y1: point.y, x2: point.x + radius + 5, y2: point.y, class: 'work-point-cross' }),
+      createSvg('line', { x1: point.x, y1: point.y - radius - 5, x2: point.x, y2: point.y + radius + 5, class: 'work-point-cross' }),
+      assetImage(WORK_POINT_ASSET, {
+        x: point.x - assetSize / 2,
+        y: point.y - assetSize / 2,
+        width: assetSize,
+        height: assetSize,
+        preserveAspectRatio: 'xMidYMid meet',
+        class: 'work-point-asset',
+      }),
+    );
     return group;
   }
 
@@ -687,6 +747,43 @@
     return group;
   };
 
+  function BasePlateSymbol(element) {
+    const point = getPointById(element.attachedGridPointId);
+    const group = createSvg('g', { class: `element base-plate-element${elementClass(element)}`, 'data-id': element.id });
+    if (!point) return group;
+    append(group, BasePlateAssetSymbol(point), labelTag(point.x + 12, point.y - 14, element.mark));
+    attachElementEvents(group, element);
+    return group;
+  }
+
+  function WorkPointSymbol(element) {
+    const point = getPointById(element.attachedGridPointId);
+    const group = createSvg('g', { class: `element work-point-element${elementClass(element)}`, 'data-id': element.id });
+    if (!point) return group;
+    append(group, WorkPointAssetSymbol(point), labelTag(point.x + 12, point.y - 14, element.mark));
+    attachElementEvents(group, element);
+    return group;
+  }
+
+  function createPointElement(type, pointId) {
+    const point = getPointById(pointId);
+    if (!point || !['basePlate', 'workPoint'].includes(type)) return null;
+    const count = state.elements.filter(element => element.type === type).length + 1;
+    const element = {
+      id: nextElementId(type),
+      type,
+      mark: type === 'basePlate' ? `BP-${count}` : `WP-${count}`,
+      attachedGridPointId: point.id,
+      size: type === 'basePlate' ? 'BP 2ft-10in' : 'WP',
+      level: point.yLabel || '',
+      notes: '',
+    };
+    state.elements.push(element);
+    state.selectedElementId = element.id;
+    state.placementMode = 'select';
+    return element;
+  }
+
   function createGussetOnHost(host, svgPoint) {
     if (!host || !['beam', 'column'].includes(host.type)) return;
     const anchor = snapHostPoint(host, svgPoint);
@@ -853,8 +950,10 @@
     const oldEndGridPointId = element.endGridPointId;
     if (state.drag.handle === 'point') {
       element.attachedGridPointId = point.id;
-      element.attachedToElementId = nearestBrbEndpoint(null, point, 18)?.elementId || element.attachedToElementId || '';
-      updateGussetHosts(element);
+      if (element.type === 'gusset') {
+        element.attachedToElementId = nearestBrbEndpoint(null, point, 18)?.elementId || element.attachedToElementId || '';
+        updateGussetHosts(element);
+      }
     } else if (state.drag.handle === 'end') {
       element.endGridPointId = point.id;
     } else {
@@ -875,10 +974,12 @@
       y: state.drag.originalStartPoint.y + svgPoint.y - state.drag.startSvgPoint.y,
     }, SNAP_DISTANCE);
     if (!targetStart) return;
-    if (element.type === 'gusset') {
+    if (isPointElement(element)) {
       element.attachedGridPointId = targetStart.id;
-      element.attachedToElementId = nearestBrbEndpoint(null, targetStart, 18)?.elementId || element.attachedToElementId || '';
-      updateGussetHosts(element);
+      if (element.type === 'gusset') {
+        element.attachedToElementId = nearestBrbEndpoint(null, targetStart, 18)?.elementId || element.attachedToElementId || '';
+        updateGussetHosts(element);
+      }
       return;
     }
     const targetAddress = gridAddress(targetStart.id);
@@ -933,6 +1034,10 @@
   }
 
   handleGridPointClick = function handleGridPointClickOverride(pointId) {
+    if (state.placementMode === 'basePlate' || state.placementMode === 'workPoint') {
+      createPointElement(state.placementMode, pointId);
+      return render();
+    }
     if (state.placementMode === 'column' || state.placementMode === 'beam') {
       if (!state.pendingStartPointId) {
         state.pendingStartPointId = pointId;
@@ -963,7 +1068,7 @@
     }
     if (event.target.closest?.('.element')) return;
     const svgPoint = eventToSvgPoint(event);
-    if (state.placementMode === 'column' || state.placementMode === 'beam') {
+    if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'basePlate' || state.placementMode === 'workPoint') {
       const nearest = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
       if (nearest) handleGridPointClick(nearest.id);
       return;
@@ -997,6 +1102,17 @@
   };
 
   propertiesTemplate = function propertiesTemplateOverride(element) {
+    if (element.type === 'basePlate' || element.type === 'workPoint') {
+      const shared = `
+        <div class="selection-summary"><span>${escapeHtml(element.type)}</span><strong>${escapeHtml(element.id)}</strong></div>
+        <label>Mark<input name="mark" value="${escapeHtml(element.mark)}" /></label>
+      `;
+      const notes = `<label>Notes<textarea name="notes" rows="4">${escapeHtml(element.notes)}</textarea></label>`;
+      return `${shared}
+        <label>Attached Grid Point<select name="attachedGridPointId">${pointOptions(element.attachedGridPointId)}</select></label>
+        <label>Size<input name="size" value="${escapeHtml(element.size || '')}" /></label>
+        ${notes}`;
+    }
     if (element.type !== 'column') return originalPropertiesTemplate(element);
     const shared = `
       <div class="selection-summary"><span>${escapeHtml(element.type)}</span><strong>${escapeHtml(element.id)}</strong></div>
@@ -1015,7 +1131,7 @@
 
   locationFor = function locationForOverride(element) {
     if (element.type === 'column') return element.startGridPointId ? `${element.startGridPointId} -> ${element.endGridPointId}` : element.gridPointId;
-    if (element.type === 'gusset') return element.attachedGridPointId;
+    if (['gusset', 'basePlate', 'workPoint'].includes(element.type)) return element.attachedGridPointId;
     return `${element.startGridPointId} -> ${element.endGridPointId}`;
   };
 
@@ -1028,6 +1144,9 @@
       return `${element.baseLevel} to ${element.topLevel}`;
     }
     if (element.type === 'gusset') return '';
+    if (element.type === 'basePlate' || element.type === 'workPoint') {
+      return getPointById(element.attachedGridPointId)?.yLabel || element.level || '';
+    }
     return element.level;
   };
 
@@ -1038,6 +1157,8 @@
     if (mode === 'beam') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Beam.' : 'Click the start grid point for the beam.';
     if (mode === 'brb') els.modeHint.textContent = state.pendingStartGussetId ? 'Click the second gusset plate for the BRB.' : 'Click the first gusset plate for the BRB.';
     if (mode === 'gusset') els.modeHint.textContent = 'Click a beam or column host near the end where the gusset belongs.';
+    if (mode === 'basePlate') els.modeHint.textContent = 'Click one grid point to place a base plate.';
+    if (mode === 'workPoint') els.modeHint.textContent = 'Click one grid point to place a work point.';
   };
 
   createProject = function createProjectOverride(event) {

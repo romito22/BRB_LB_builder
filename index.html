@@ -43,6 +43,14 @@
           <span class="ribbon-icon">G</span>
           <span>Gusset</span>
         </button>
+        <button type="button" data-tool="basePlate" class="ribbon-button">
+          <span class="ribbon-icon">BP</span>
+          <span>Base Plate</span>
+        </button>
+        <button type="button" data-tool="workPoint" class="ribbon-button">
+          <span class="ribbon-icon">WP</span>
+          <span>Work Point</span>
+        </button>
         <button type="button" id="deleteSelectedBtn" class="ribbon-button">
           <span class="ribbon-icon">Del</span>
           <span>Delete</span>
@@ -77,6 +85,14 @@
           <span class="library-symbol gusset"></span>
           <span><strong>Gusset Plate</strong><small>Attach to grid point</small></span>
         </button>
+        <button type="button" class="library-card" data-tool="basePlate">
+          <span class="library-symbol base-plate"></span>
+          <span><strong>Base Plate</strong><small>Click one grid point</small></span>
+        </button>
+        <button type="button" class="library-card" data-tool="workPoint">
+          <span class="library-symbol work-point"></span>
+          <span><strong>Work Point</strong><small>Click one grid point</small></span>
+        </button>
       </section>
 
       <section class="sidebar-section">
@@ -87,6 +103,23 @@
           <div><dt>Elevation</dt><dd id="yLabelsValue">-</dd></div>
           <div><dt>Levels</dt><dd id="levelsValue">-</dd></div>
         </dl>
+      </section>
+
+      <section class="sidebar-section">
+        <h2>Element Colors</h2>
+        <table class="color-map-table" aria-label="Element stroke and fill colors">
+          <thead>
+            <tr><th>Element</th><th>Light stroke/fill</th><th>Dark stroke/fill</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Column</td><td><span class="color-chip column"></span><small>#111827 / blue</small></td><td><span class="color-chip column dark"></span><small>#f8fafc / blue</small></td></tr>
+            <tr><td>Beam</td><td><span class="color-chip beam"></span><small>#111827 / green</small></td><td><span class="color-chip beam dark"></span><small>#f8fafc / green</small></td></tr>
+            <tr><td>BRB</td><td><span class="color-chip brb"></span><small>#111827 / amber</small></td><td><span class="color-chip brb dark"></span><small>#f8fafc / amber</small></td></tr>
+            <tr><td>Gusset</td><td><span class="color-chip gusset"></span><small>#111827 / violet</small></td><td><span class="color-chip gusset dark"></span><small>#f8fafc / violet</small></td></tr>
+            <tr><td>Base Plate</td><td><span class="color-chip base-plate"></span><small>#111827 / yellow</small></td><td><span class="color-chip base-plate dark"></span><small>#f8fafc / yellow</small></td></tr>
+            <tr><td>Work Point</td><td><span class="color-chip work-point"></span><small>#111827 / red</small></td><td><span class="color-chip work-point dark"></span><small>#f8fafc / red</small></td></tr>
+          </tbody>
+        </table>
       </section>
     </aside>
 
@@ -120,6 +153,8 @@
           <button type="button" data-filter="beam">Beams</button>
           <button type="button" data-filter="brb">BRBs</button>
           <button type="button" data-filter="gusset">Gussets</button>
+          <button type="button" data-filter="basePlate">Base Plates</button>
+          <button type="button" data-filter="workPoint">Work Points</button>
         </div>
       </div>
       <div class="table-scroll">
