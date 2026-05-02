@@ -242,32 +242,32 @@
     });
   }
 
-  function renderMarkerText(svg, x, y, text, className = 'grid-label') {
-    const label = createSvg('text', { x, y, class: className, 'text-anchor': 'middle' });
+  function renderMarkerText(svg, x, y, text, className = 'grid-label', anchor = 'middle') {
+    const label = createSvg('text', { x, y, class: className, 'text-anchor': anchor });
     label.textContent = text;
     append(svg, label);
   }
 
   renderGrid = function renderGridWithAssets(svg, minX, minY, maxX, maxY) {
-    const levelMarkWidth = Math.min(176, Math.max(124, minX - 16));
+    const levelLabelX = maxX + 128;
+    const levelTargetX = maxX + 226;
     verticalLabels().forEach((label, index) => {
       const y = minY + index * projectStorySpacing();
       append(svg,
-        createSvg('line', { x1: minX - 42, y1: y, x2: maxX + 42, y2: y, class: 'grid-line' }),
-        MarkAsset(LEVEL_MARK_ASSET, minX - levelMarkWidth, y - MARK_VIEWBOX.height / 2, levelMarkWidth, MARK_VIEWBOX.height),
+        createSvg('line', { x1: minX - 104, y1: y, x2: levelTargetX + 28, y2: y, class: 'grid-line grid-line-reference' }),
+        createSvg('circle', { cx: levelTargetX, cy: y, r: 18, class: 'level-target-circle' }),
+        createSvg('path', { d: `M ${levelTargetX} ${y - 18} V ${y + 18} M ${levelTargetX - 18} ${y} H ${levelTargetX + 18}`, class: 'level-target-cross' }),
       );
-      append(svg, labelTag(minX - levelMarkWidth + 8, y + 4, label, 'start'));
+      renderMarkerText(svg, levelLabelX, y - 12, label, 'level-name-label', 'start');
     });
 
     state.project.xGridLabels.forEach((label, index) => {
       const x = minX + index * projectBaySpacing();
-      append(svg, createSvg('line', { x1: x, y1: minY - 42, x2: x, y2: maxY + 42, class: 'grid-line' }));
       append(svg,
-        MarkAsset(GRID_MARK_ASSET, -142, -MARK_VIEWBOX.height / 2, 142, MARK_VIEWBOX.height, `translate(${x} ${minY - 28}) rotate(90)`),
-        MarkAsset(GRID_MARK_ASSET, -142, -MARK_VIEWBOX.height / 2, 142, MARK_VIEWBOX.height, `translate(${x} ${maxY + 28}) rotate(-90)`),
+        createSvg('line', { x1: x, y1: minY - 120, x2: x, y2: maxY + 84, class: 'grid-line grid-line-reference' }),
+        createSvg('circle', { cx: x, cy: minY - 88, r: 19, class: 'grid-bubble' }),
       );
-      renderMarkerText(svg, x, minY - 66, label);
-      renderMarkerText(svg, x, maxY + 76, label);
+      renderMarkerText(svg, x, minY - 82, label, 'grid-name-label');
     });
     append(svg, createSvg('line', { x1: 52, y1: maxY + 104, x2: maxX + 116, y2: maxY + 104, class: 'sheet-title-line' }));
   };
@@ -903,7 +903,7 @@
   applyTheme(storedTheme());
 
   initializeDefaultProject = function initializeDefaultProjectOverride() {
-    setProject('BRB Frame Layout', ['A', 'B'], ['1', '2'], false);
+    setProject('BRB Frame Layout', ['1', '2'], ['level 1', 'level 2'], false);
     state.project.canvasWidthFt = FEET_PER_CANVAS;
     state.project.canvasHeightFt = FEET_PER_CANVAS;
     state.project.bayWidthFt = 8;

@@ -394,11 +394,38 @@ h2 {
   stroke-width: 0.7;
 }
 
+.grid-line-reference {
+  stroke: #111827;
+  stroke-dasharray: 16 5 2 5;
+  stroke-opacity: 0.86;
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+}
+
 .grid-label {
   fill: #2c3440;
   font-size: 13px;
   font-weight: 800;
   pointer-events: none;
+}
+
+.grid-name-label,
+.level-name-label {
+  fill: #1d4ed8;
+  font-size: 24px;
+  font-weight: 800;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 3px;
+}
+
+.grid-name-label {
+  font-size: 22px;
+}
+
+.level-name-label {
+  font-size: 20px;
 }
 
 .grid-mark-asset {
@@ -453,8 +480,23 @@ h2 {
 
 .grid-bubble {
   fill: #ffffff;
-  stroke: #6b7280;
-  stroke-width: 1.2;
+  stroke: #111827;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.level-target-circle {
+  fill: #ffffff;
+  stroke: #111827;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.level-target-cross {
+  fill: none;
+  stroke: #111827;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
 }
 
 .grid-point {
@@ -1006,12 +1048,34 @@ body.theme-dark .sheet-title-line {
   stroke: #475569;
 }
 
+body.theme-dark .grid-line-reference {
+  stroke: #e5e7eb;
+  stroke-opacity: 0.72;
+}
+
 body.theme-dark .grid-label,
+body.theme-dark .grid-name-label,
+body.theme-dark .level-name-label,
 body.theme-dark .element-label,
 body.theme-dark .brb-label,
 body.theme-dark .label-tag text,
 body.theme-dark .selection-tag text {
   fill: var(--text-strong);
+}
+
+body.theme-dark .grid-name-label,
+body.theme-dark .level-name-label {
+  stroke: rgba(15, 23, 42, 0.9);
+}
+
+body.theme-dark .grid-bubble,
+body.theme-dark .level-target-circle {
+  fill: #111827;
+  stroke: #f8fafc;
+}
+
+body.theme-dark .level-target-cross {
+  stroke: #f8fafc;
 }
 
 body.theme-dark .label-tag rect,
