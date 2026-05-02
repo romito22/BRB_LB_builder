@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BRB_LB Builder</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="canvas-overrides.css" />
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -58,7 +59,7 @@
         <h2>Element Library</h2>
         <button type="button" class="library-card" data-tool="column">
           <span class="library-symbol column"></span>
-          <span><strong>Column</strong><small>Full-height elevation member</small></span>
+          <span><strong>Column</strong><small>Click two grid points</small></span>
         </button>
         <button type="button" class="library-card" data-tool="beam">
           <span class="library-symbol beam"></span>
@@ -146,10 +147,10 @@
         <input id="projectName" type="text" value="BRB Frame Layout" required />
       </label>
       <label>X grid labels
-        <input id="xLabels" type="text" value="A,B,C,D" placeholder="A,B,C,D" required />
+        <input id="xLabels" type="text" value="A,B" placeholder="A,B" required />
       </label>
       <label>Levels
-        <input id="levels" type="text" value="Level 1,Level 2,Roof" placeholder="Level 1,Level 2,Roof" required />
+        <input id="levels" type="text" value="1,2" placeholder="1,2" required />
       </label>
       <div class="modal-actions">
         <button type="submit">Create Grid</button>
@@ -158,5 +159,6 @@
   </div>
 
   <script src="app.js"></script>
+  <script src="canvas-overrides.js"></script>
 </body>
 </html>

@@ -60,10 +60,6 @@ function gridPointId(xLabel, yLabel) {
   return `${xLabel}-${yLabel}`;
 }
 
-function projectLevels() {
-  return state.project?.levels?.length ? state.project.levels : ['Level 1'];
-}
-
 function verticalLabels() {
   return state.project?.yGridLabels?.length ? state.project.yGridLabels : projectLevels().slice().reverse();
 }
@@ -92,6 +88,10 @@ function getPointByLabels(xLabel, yLabel) {
   return state.gridPoints.find(point => point.xLabel === xLabel && point.yLabel === yLabel);
 }
 
+function projectLevels() {
+  return state.project?.levels?.length ? state.project.levels : ['Level 1'];
+}
+
 function defaultLevel(preferRoof = false) {
   const levels = projectLevels();
   if (preferRoof) return levels.find(level => level.toLowerCase() === 'roof') || levels[levels.length - 1] || levels[0];
@@ -110,8 +110,15 @@ function pointForColumnLevel(element, level) {
 }
 
 function getElementStartEnd(element) {
-  if (element.type === 'column') return [pointForColumnLevel(element, element.baseLevel), pointForColumnLevel(element, element.topLevel)];
-  if (element.type === 'beam' || element.type === 'brb') return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
+  if (element.type === 'column') {
+    if (element.startGridPointId || element.endGridPointId) {
+      return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
+    }
+    return [pointForColumnLevel(element, element.baseLevel), pointForColumnLevel(element, element.topLevel)];
+  }
+  if (element.type === 'beam' || element.type === 'brb') {
+    return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
+  }
   const point = getPointById(element.attachedGridPointId);
   return [point, point];
 }
@@ -184,7 +191,7 @@ function drawingExtents() {
   const minY = SHEET_PAD_TOP;
   const maxX = SHEET_PAD_X + (xLabels.length - 1) * BAY_SPACING;
   const maxY = SHEET_PAD_TOP + (yLabels.length - 1) * STORY_HEIGHT;
-  return { minX, minY, maxX, maxY };
+  return { minX, minY, maxX, maxY, xLabels, yLabels };
 }
 
 function canvasSize() {
@@ -237,10 +244,12 @@ function labelTag(x, y, text, anchor = 'start', className = 'label-tag') {
   const height = 18;
   const left = anchor === 'middle' ? x - width / 2 : anchor === 'end' ? x - width : x;
   const group = createSvg('g', { class: className });
-  const rect = createSvg('rect', { x: left, y: y - 13, width, height });
-  const label = createSvg('text', { x: left + paddingX, y, class: 'element-label' });
-  label.textContent = text;
-  append(group, rect, label);
+  append(
+    group,
+    createSvg('rect', { x: left, y: y - 13, width, height }),
+    createSvg('text', { x: left + paddingX, y: y, class: 'element-label' }),
+  );
+  group.lastChild.textContent = text;
   return group;
 }
 
@@ -278,9 +287,17 @@ function rotatedRect(start, end, width, className) {
   return createSvg('polygon', { points, class: className });
 }
 
+function localPath(points) {
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ') + ' Z';
+}
+
 function transformedPath(start, end, d, className) {
   const angleDeg = getAngle(start, end) * 180 / Math.PI;
-  return createSvg('path', { d, class: className, transform: `translate(${start.x} ${start.y}) rotate(${angleDeg})` });
+  return createSvg('path', {
+    d,
+    class: className,
+    transform: `translate(${start.x} ${start.y}) rotate(${angleDeg})`,
+  });
 }
 
 function MemberStickSymbol(start, end, width, className) {
@@ -316,7 +333,7 @@ function SelectionHandles(element) {
   const [start, end] = getElementStartEnd(element);
   if (!start) return null;
   const group = createSvg('g', { class: 'selection-handles' });
-  const points = element.type === 'column' ? [getMidpoint(start, end)] : element.type === 'gusset' ? [start] : [start, end];
+  const points = element.type === 'gusset' ? [start] : [start, end].filter(Boolean);
   points.forEach(point => append(group, createSvg('circle', { cx: point.x, cy: point.y, r: 7, class: 'selection-grip' })));
   append(group, labelTag(points[0].x + 12, points[0].y - 14, `${element.mark} selected`, 'start', 'selection-tag'));
   return group;
@@ -325,12 +342,9 @@ function SelectionHandles(element) {
 function selectionOutlineFor(element) {
   const [start, end] = getElementStartEnd(element);
   if (!start) return null;
-  if (element.type === 'column') {
-    const y1 = Math.min(start.y, end.y) - 18;
-    const y2 = Math.max(start.y, end.y) + 18;
-    return createSvg('rect', { x: start.x - 28, y: y1, width: 56, height: y2 - y1, class: 'selection-outline' });
+  if (element.type === 'gusset') {
+    return createSvg('circle', { cx: start.x, cy: start.y, r: 56, class: 'selection-outline' });
   }
-  if (element.type === 'gusset') return createSvg('circle', { cx: start.x, cy: start.y, r: 56, class: 'selection-outline' });
   const normal = getNormalOffset(start, end, 24);
   const points = [
     `${start.x + normal.x},${start.y + normal.y}`,
@@ -349,18 +363,42 @@ function renderCanvas() {
   svg.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);
   svg.setAttribute('width', size.width);
   svg.setAttribute('height', size.height);
+
   if (!state.project) return;
+
   const { minX, minY, maxX, maxY } = drawingExtents();
-  append(svg, createSvg('rect', { x: 24, y: 24, width: size.width - 48, height: size.height - 48, class: 'drawing-sheet' }));
+  renderSheetBackground(svg, size);
   renderGrid(svg, minX, minY, maxX, maxY);
   renderDimensions(svg, minX, minY, maxX, maxY);
+
   state.elements.filter(element => element.type === 'beam').forEach(element => svg.appendChild(BeamSymbol(element)));
   state.elements.filter(element => element.type === 'brb').forEach(element => svg.appendChild(BRBSymbol(element)));
   state.elements.filter(element => element.type === 'column').forEach(element => svg.appendChild(ColumnSymbol(element)));
   state.elements.filter(element => element.type === 'gusset').forEach(element => svg.appendChild(GussetPlateSymbol(element)));
+
   renderSelection(svg);
   renderGridPoints(svg);
   renderPlacementPreview(svg);
+}
+
+function renderSheetBackground(svg, size) {
+  const defs = createSvg('defs');
+  const pattern = createSvg('pattern', {
+    id: 'draftingGrid',
+    width: 60,
+    height: 60,
+    patternUnits: 'userSpaceOnUse',
+  });
+  append(pattern,
+    createSvg('path', { d: 'M 12 0 V 60 M 24 0 V 60 M 36 0 V 60 M 48 0 V 60 M 0 12 H 60 M 0 24 H 60 M 0 36 H 60 M 0 48 H 60', class: 'sheet-grid-minor' }),
+    createSvg('path', { d: 'M 60 0 V 60 M 0 60 H 60', class: 'sheet-grid-major' }),
+  );
+  append(defs, pattern);
+  append(svg, defs);
+  append(svg,
+    createSvg('rect', { x: 24, y: 24, width: size.width - 48, height: size.height - 48, class: 'drawing-sheet' }),
+    createSvg('rect', { x: 24, y: 24, width: size.width - 48, height: size.height - 48, class: 'sheet-grid-fill' }),
+  );
 }
 
 function renderGrid(svg, minX, minY, maxX, maxY) {
@@ -369,6 +407,7 @@ function renderGrid(svg, minX, minY, maxX, maxY) {
     append(svg, createSvg('line', { x1: minX - 42, y1: y, x2: maxX + 42, y2: y, class: 'grid-line' }));
     append(svg, labelTag(minX - 112, y + 4, label, 'start'));
   });
+
   state.project.xGridLabels.forEach((label, index) => {
     const x = SHEET_PAD_X + index * BAY_SPACING;
     append(svg, createSvg('line', { x1: x, y1: minY - 42, x2: x, y2: maxY + 42, class: 'grid-line' }));
@@ -401,7 +440,13 @@ function renderGridPoints(svg) {
     const isPending = state.pendingStartPointId === point.id;
     const isSnap = state.snapPointId === point.id;
     if (isSnap) append(svg, createSvg('circle', { cx: point.x, cy: point.y, r: 16, class: 'snap-halo' }));
-    const circle = createSvg('circle', { cx: point.x, cy: point.y, r: isPending ? 8 : 4.5, class: `grid-point${isPending ? ' pending' : ''}`, 'data-point-id': point.id });
+    const circle = createSvg('circle', {
+      cx: point.x,
+      cy: point.y,
+      r: isPending ? 8 : 4.5,
+      class: `grid-point${isPending ? ' pending' : ''}`,
+      'data-point-id': point.id,
+    });
     circle.addEventListener('click', event => {
       event.stopPropagation();
       handleGridPointClick(point.id);
@@ -417,13 +462,14 @@ function renderSelection(svg) {
 }
 
 function renderPlacementPreview(svg) {
-  if (!state.pendingStartPointId || !['beam', 'brb'].includes(state.placementMode)) return;
+  if (!state.pendingStartPointId || !['column', 'beam', 'brb'].includes(state.placementMode)) return;
   const start = getPointById(state.pendingStartPointId);
   if (!start) return;
   const end = state.snapPointId ? getPointById(state.snapPointId) : state.pointerSvgPoint;
   if (!end) return;
   append(svg, createSvg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y, class: 'placement-preview' }));
-  const text = `Select end point for ${state.placementMode === 'beam' ? 'Beam' : 'BRB'}`;
+  const toolName = { column: 'Column', beam: 'Beam', brb: 'BRB' }[state.placementMode];
+  const text = `Select end point for ${toolName}`;
   const group = createSvg('g', { class: 'instruction-banner' });
   append(group, createSvg('rect', { x: start.x + 18, y: start.y - 42, width: 188, height: 26 }));
   const label = createSvg('text', { x: start.x + 28, y: start.y - 24 });
@@ -451,18 +497,13 @@ function attachElementEvents(node, element) {
 }
 
 function ColumnSymbol(element) {
-  const [base, top] = getElementStartEnd(element);
+  const [start, end] = getElementStartEnd(element);
   const group = createSvg('g', { class: `element column-element${elementClass(element)}`, 'data-id': element.id });
-  if (!base || !top) return group;
-  const x = base.x;
-  const y1 = Math.min(base.y, top.y);
-  const y2 = Math.max(base.y, top.y);
-  append(group,
-    MemberStickSymbol({ x, y: y1 }, { x, y: y2 }, 24, 'column-stick'),
-    createSvg('rect', { x: x - 27, y: y2 + 4, width: 54, height: 7, class: 'column-cap' }),
-  );
-  append(group, labelTag(x + 28, y1 + 20, element.mark));
-  group.addEventListener('pointerdown', event => beginColumnDrag(event, element.id));
+  if (!start || !end) return group;
+  append(group, MemberStickSymbol(start, end, 24, 'column-stick'));
+  const mid = getMidpoint(start, end);
+  const normal = getNormalOffset(start, end, -30);
+  append(group, labelTag(mid.x + normal.x, mid.y + normal.y, element.mark));
   attachElementEvents(group, element);
   return group;
 }
@@ -492,9 +533,11 @@ function BRBSymbol(element) {
   append(group, BrbOutline(start, end), Centerline(centerStart, centerEnd));
   renderBraceEndDetail(group, start, angle, 1);
   renderBraceEndDetail(group, end, angle + Math.PI, -1);
+
   const mid = getMidpoint(start, end);
   const normal = getNormalOffset(start, end, -28);
-  append(group, labelTag(mid.x + normal.x, mid.y + normal.y, element.mark, 'middle'));
+  const label = labelTag(mid.x + normal.x, mid.y + normal.y, element.mark, 'middle');
+  append(group, label);
   attachElementEvents(group, element);
   return group;
 }
@@ -579,22 +622,19 @@ function GussetPlateSymbol(element) {
 }
 
 function handleGridPointClick(pointId) {
-  if (state.placementMode === 'column') {
-    addColumnAtPoint(pointId);
-    return;
-  }
   if (state.placementMode === 'gusset') {
     const brbHit = nearestBrbEndpoint(null, getPointById(pointId), 18);
     createGusset(pointId, brbHit?.elementId || '');
     return render();
   }
-  if (state.placementMode === 'beam' || state.placementMode === 'brb') {
+  if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'brb') {
     if (!state.pendingStartPointId) {
       state.pendingStartPointId = pointId;
       state.snapPointId = pointId;
       return render();
     }
     if (state.pendingStartPointId === pointId) return;
+    if (state.placementMode === 'column') createColumn(state.pendingStartPointId, pointId);
     if (state.placementMode === 'beam') createBeam(state.pendingStartPointId, pointId);
     if (state.placementMode === 'brb') createBrb(state.pendingStartPointId, pointId);
     state.pendingStartPointId = null;
@@ -607,12 +647,8 @@ function handleCanvasClick(event) {
   if (!state.project) return;
   if (event.target.closest?.('.element')) return;
   const svgPoint = eventToSvgPoint(event);
-  if (state.placementMode === 'column') {
-    const nearest = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
-    if (nearest) addColumnAtPoint(nearest.id);
-    return;
-  }
-  if (state.placementMode === 'beam' || state.placementMode === 'brb' || state.placementMode === 'gusset') {
+
+  if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'brb' || state.placementMode === 'gusset') {
     const nearest = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
     if (nearest) handleGridPointClick(nearest.id);
     return;
@@ -628,25 +664,22 @@ function addColumn() {
   setPlacementMode('column');
 }
 
-function addColumnAtPoint(pointId) {
-  const point = getPointById(pointId);
-  if (!point) return;
-  const base = getPointByLabels(point.xLabel, defaultLevel()) || point;
+function createColumn(startGridPointId, endGridPointId) {
+  const start = getPointById(startGridPointId);
+  const end = getPointById(endGridPointId);
   const element = {
     id: nextElementId('column'),
     type: 'column',
     mark: nextMark('column'),
     size: 'W14x45',
-    gridPointId: base.id,
-    baseLevel: defaultLevel(),
-    topLevel: lastLevel(),
+    startGridPointId,
+    endGridPointId,
+    level: start?.xLabel === end?.xLabel ? `${start?.yLabel || ''} to ${end?.yLabel || ''}` : '',
     orientation: 'strong-axis',
     notes: '',
   };
   state.elements.push(element);
   state.selectedElementId = element.id;
-  state.placementMode = 'select';
-  render();
 }
 
 function createBeam(startGridPointId, endGridPointId) {
@@ -720,7 +753,7 @@ function nearestBrbEndpoint(brbElement, svgPoint, maxDistance = SNAP_DISTANCE) {
       bestDistance = distance;
     }
   });
-  return best && bestDistance <= maxDistance ? { ...best.point, elementId: best.elementId } : null;
+  return bestDistance <= maxDistance ? { ...best.point, elementId: best.elementId } : null;
 }
 
 function beginColumnDrag(event, elementId) {
@@ -745,9 +778,10 @@ function handlePointerMove(event) {
   state.pointerSvgPoint = svgPoint;
   const snap = findNearestGridPoint(svgPoint, SNAP_DISTANCE);
   state.snapPointId = snap?.id || null;
+
   if (state.drag) {
     const element = state.elements.find(item => item.id === state.drag.elementId);
-    if (element?.type === 'column') {
+    if (element?.type === 'column' && !element.startGridPointId) {
       const point = findNearestGridPoint(svgPoint);
       if (point) {
         const base = getPointByLabels(point.xLabel, defaultLevel()) || point;
@@ -755,6 +789,7 @@ function handlePointerMove(event) {
       }
     }
   }
+
   if (state.drag || state.pendingStartPointId || state.placementMode === 'column') renderCanvas();
 }
 
@@ -778,11 +813,13 @@ function handlePointerUp(event) {
 function renderProperties() {
   const element = selectedElement();
   els.selectedBadge.textContent = element ? `${element.type.toUpperCase()} ${element.id}` : 'No element selected';
+
   if (!element) {
     els.propertiesPanel.className = 'panel-empty';
     els.propertiesPanel.textContent = 'No element selected';
     return;
   }
+
   els.propertiesPanel.className = 'property-form';
   els.propertiesPanel.innerHTML = propertiesTemplate(element);
   els.propertiesPanel.querySelectorAll('input, textarea, select').forEach(input => {
@@ -812,10 +849,9 @@ function propertiesTemplate(element) {
   if (element.type === 'column') {
     return `${shared}
       <label>Size<input name="size" value="${escapeHtml(element.size)}" /></label>
-      <label>Grid Point<select name="gridPointId">${pointOptions(element.gridPointId)}</select></label>
       <div class="form-grid">
-        <label>Base Level<select name="baseLevel">${levelOptions(element.baseLevel)}</select></label>
-        <label>Top Level<select name="topLevel">${levelOptions(element.topLevel)}</select></label>
+        <label>Start<select name="startGridPointId">${pointOptions(element.startGridPointId)}</select></label>
+        <label>End<select name="endGridPointId">${pointOptions(element.endGridPointId)}</select></label>
       </div>
       <label>Orientation<select name="orientation">${optionList(['strong-axis', 'weak-axis'], element.orientation)}</select></label>
       ${notes}`;
@@ -867,7 +903,7 @@ function updateElementField(id, field, value) {
 }
 
 function locationFor(element) {
-  if (element.type === 'column') return element.gridPointId;
+  if (element.type === 'column') return element.startGridPointId ? `${element.startGridPointId} -> ${element.endGridPointId}` : element.gridPointId;
   if (element.type === 'gusset') return element.attachedGridPointId;
   return `${element.startGridPointId} -> ${element.endGridPointId}`;
 }
@@ -879,17 +915,27 @@ function sizeOrCoreArea(element) {
 }
 
 function levelFor(element) {
-  if (element.type === 'column') return `${element.baseLevel} to ${element.topLevel}`;
+  if (element.type === 'column') {
+    if (element.startGridPointId || element.endGridPointId) {
+      const [start, end] = getElementStartEnd(element);
+      return [start?.yLabel, end?.yLabel].filter(Boolean).join(' to ');
+    }
+    return `${element.baseLevel} to ${element.topLevel}`;
+  }
   if (element.type === 'gusset') return '';
   return element.level;
 }
 
 function renderTable() {
-  const filtered = state.tableFilter === 'all' ? state.elements : state.elements.filter(element => element.type === state.tableFilter);
+  const filtered = state.tableFilter === 'all'
+    ? state.elements
+    : state.elements.filter(element => element.type === state.tableFilter);
+
   if (!filtered.length) {
     els.dataTableBody.innerHTML = '<tr><td colspan="7" class="empty-row">No elements created.</td></tr>';
     return;
   }
+
   els.dataTableBody.innerHTML = filtered.map(element => `
     <tr data-id="${escapeHtml(element.id)}" class="${state.selectedElementId === element.id ? 'selected-row' : ''}">
       <td>${escapeHtml(element.id)}</td>
@@ -901,6 +947,7 @@ function renderTable() {
       <td>${escapeHtml(element.notes)}</td>
     </tr>
   `).join('');
+
   els.dataTableBody.querySelectorAll('tr[data-id]').forEach(row => {
     row.addEventListener('click', () => setSelectedElement(row.dataset.id));
   });
@@ -909,7 +956,7 @@ function renderTable() {
 function renderModeHint() {
   const mode = state.placementMode;
   if (mode === 'select') els.modeHint.textContent = 'Select an element to edit its properties.';
-  if (mode === 'column') els.modeHint.textContent = 'Click a grid line or point to place a full-height column.';
+  if (mode === 'column') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Column.' : 'Click the start grid point for the column.';
   if (mode === 'beam') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for Beam.' : 'Click the start grid point for the beam.';
   if (mode === 'brb') els.modeHint.textContent = state.pendingStartPointId ? 'Select end point for BRB.' : 'Click the start grid point for the BRB.';
   if (mode === 'gusset') els.modeHint.textContent = 'Click a BRB endpoint or grid point to place a gusset plate.';
@@ -942,7 +989,15 @@ function exportCsv() {
     return;
   }
   const headers = ['id', 'type', 'mark', 'location', 'sizeOrCoreArea', 'level', 'notes'];
-  const rows = state.elements.map(element => [element.id, element.type, element.mark, locationFor(element), sizeOrCoreArea(element), levelFor(element), element.notes]);
+  const rows = state.elements.map(element => [
+    element.id,
+    element.type,
+    element.mark,
+    locationFor(element),
+    sizeOrCoreArea(element),
+    levelFor(element),
+    element.notes,
+  ]);
   const csv = [headers, ...rows]
     .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
     .join('\n');
@@ -962,14 +1017,21 @@ function createProject(event) {
   const name = document.getElementById('projectName').value.trim();
   const xGridLabels = parseCsv(document.getElementById('xLabels').value);
   const levels = parseCsv(document.getElementById('levels').value);
-  setProject(name, xGridLabels, levels, true);
+  setProject(name, xGridLabels, levels, false);
   closeProjectSetup();
   render();
 }
 
 function setProject(name, xGridLabels, levels, withStarterFrame = false) {
   const yGridLabels = levels.slice().reverse();
-  state.project = { id: `PRJ-${Date.now()}`, name, xGridLabels, yGridLabels, levels, createdAt: new Date().toISOString() };
+  state.project = {
+    id: `PRJ-${Date.now()}`,
+    name,
+    xGridLabels,
+    yGridLabels,
+    levels,
+    createdAt: new Date().toISOString(),
+  };
   state.gridPoints = generateGridPoints(xGridLabels, yGridLabels);
   state.elements = [];
   state.selectedElementId = null;
@@ -980,8 +1042,10 @@ function setProject(name, xGridLabels, levels, withStarterFrame = false) {
 
 function createStarterFrame() {
   const p = (x, y) => getPointByLabels(x, y)?.id;
-  const col1 = p('B', 'Level 1');
-  const col2 = p('D', 'Level 1');
+  const col1Base = p('B', 'Level 1');
+  const col1Top = p('B', 'Roof');
+  const col2Base = p('D', 'Level 1');
+  const col2Top = p('D', 'Roof');
   const roofA = p('A', 'Roof');
   const roofB = p('B', 'Roof');
   const roofC = p('C', 'Roof');
@@ -989,8 +1053,8 @@ function createStarterFrame() {
   const level2B = p('B', 'Level 2');
   const level2C = p('C', 'Level 2');
   const level2D = p('D', 'Level 2');
-  if (col1) addStarterColumn(col1);
-  if (col2) addStarterColumn(col2);
+  if (col1Base && col1Top) addStarterColumn(col1Base, col1Top);
+  if (col2Base && col2Top) addStarterColumn(col2Base, col2Top);
   if (roofA && roofB) addStarterBeam(roofA, roofB);
   if (level2B && level2D) addStarterBeam(level2B, level2D);
   if (level2B && roofC) addStarterBrb(level2B, roofC);
@@ -1003,8 +1067,8 @@ function createStarterFrame() {
   state.placementMode = 'select';
 }
 
-function addStarterColumn(gridPointId) {
-  state.elements.push({ id: nextElementId('column'), type: 'column', mark: nextMark('column'), size: 'W14x45', gridPointId, baseLevel: defaultLevel(), topLevel: lastLevel(), orientation: 'strong-axis', notes: '' });
+function addStarterColumn(startGridPointId, endGridPointId) {
+  createColumn(startGridPointId, endGridPointId);
 }
 
 function addStarterBeam(startGridPointId, endGridPointId) {
@@ -1016,7 +1080,7 @@ function addStarterBrb(startGridPointId, endGridPointId) {
 }
 
 function initializeDefaultProject() {
-  setProject('BRB Frame Layout', ['A', 'B', 'C', 'D'], ['Level 1', 'Level 2', 'Roof'], true);
+  setProject('BRB Frame Layout', ['A', 'B'], ['1', '2'], false);
   render();
 }
 

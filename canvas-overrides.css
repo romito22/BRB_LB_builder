@@ -1,4 +1,6 @@
 .canvas-stage {
+  overflow: hidden;
+  padding: 0;
   background:
     linear-gradient(#edf1f5 1px, transparent 1px),
     linear-gradient(90deg, #edf1f5 1px, transparent 1px),
@@ -7,7 +9,8 @@
 }
 
 .drawing-sheet {
-  fill: #fbfdff;
+  fill: transparent;
+  filter: none;
 }
 
 .sheet-grid-fill {

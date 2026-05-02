@@ -1,4 +1,8 @@
 (function () {
+  const BRACE_ASSET = 'assets/brace.svg';
+  const GUSSET_ASSET = 'assets/gusset_normal.svg';
+  const BRACE_VIEWBOX = { width: 11.58579, height: 202.38155, topPin: 13.45, bottomPin: 188.95 };
+  const GUSSET_SIZE = 76;
   const originalPropertiesTemplate = propertiesTemplate;
 
   getElementStartEnd = function getElementStartEndOverride(element) {
@@ -112,6 +116,69 @@
     return group;
   };
 
+  function assetImage(href, attrs = {}) {
+    const image = createSvg('image', {
+      href,
+      ...attrs,
+    });
+    image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
+    return image;
+  }
+
+  function BraceAssetSymbol(start, end) {
+    const length = distanceToPoint(start, end);
+    if (!length) return null;
+    const angleDeg = getAngle(start, end) * 180 / Math.PI;
+    const pinDistance = BRACE_VIEWBOX.bottomPin - BRACE_VIEWBOX.topPin;
+    const scaleY = length / pinDistance;
+    const imageHeight = BRACE_VIEWBOX.height * scaleY;
+    const imageWidth = Math.max(28, BRACE_VIEWBOX.width * scaleY * 1.35);
+    const image = assetImage(BRACE_ASSET, {
+      x: -imageWidth / 2,
+      y: -BRACE_VIEWBOX.topPin * scaleY,
+      width: imageWidth,
+      height: imageHeight,
+      preserveAspectRatio: 'none',
+      class: 'brace-asset',
+    });
+    const group = createSvg('g', {
+      class: 'brace-asset-wrap',
+      transform: `translate(${start.x} ${start.y}) rotate(${angleDeg - 90})`,
+    });
+    append(group, image);
+    return group;
+  }
+
+  function GussetAssetSymbol(point, angle, side = 1) {
+    const angleDeg = angle * 180 / Math.PI;
+    const flip = side < 0 ? ' scale(1 -1)' : '';
+    const group = createSvg('g', {
+      class: 'gusset-asset-wrap',
+      transform: `translate(${point.x} ${point.y}) rotate(${angleDeg})${flip}`,
+    });
+    append(group, assetImage(GUSSET_ASSET, {
+      x: 0,
+      y: -GUSSET_SIZE,
+      width: GUSSET_SIZE,
+      height: GUSSET_SIZE,
+      preserveAspectRatio: 'xMinYMax meet',
+      class: 'gusset-asset',
+    }));
+    return group;
+  }
+
+  BRBSymbol = function BRBSymbolAssetOverride(element) {
+    const [start, end] = getElementStartEnd(element);
+    const group = createSvg('g', { class: `element brb-element${elementClass(element)}`, 'data-id': element.id });
+    if (!start || !end) return group;
+    append(group, BraceAssetSymbol(start, end));
+    const mid = getMidpoint(start, end);
+    const normal = getNormalOffset(start, end, -28);
+    append(group, labelTag(mid.x + normal.x, mid.y + normal.y, element.mark, 'middle'));
+    attachElementEvents(group, element);
+    return group;
+  };
+
   createColumn = function createColumnOverride(startGridPointId, endGridPointId) {
     const start = getPointById(startGridPointId);
     const end = getPointById(endGridPointId);
@@ -128,6 +195,33 @@
     };
     state.elements.push(element);
     state.selectedElementId = element.id;
+  };
+
+  GussetPlateSymbol = function GussetPlateSymbolAssetOverride(element) {
+    const point = getPointById(element.attachedGridPointId);
+    const group = createSvg('g', { class: `element gusset-element${elementClass(element)}`, 'data-id': element.id });
+    if (!point) return group;
+    const brb = state.elements.find(item => item.id === element.attachedToElementId && item.type === 'brb');
+    let angle = -Math.PI / 4;
+    let side = 1;
+    if (brb) {
+      const [start, end] = getElementStartEnd(brb);
+      if (start && end) {
+        angle = point.id === start.id ? getAngle(start, end) : getAngle(end, start);
+        side = point.id === start.id ? 1 : -1;
+      }
+    }
+    append(
+      group,
+      GussetAssetSymbol(point, angle, side),
+      Centerline(point, getOffsetPoint(point, angle, 62)),
+      BoltPattern(getOffsetPoint(point, angle, 35), angle, Number(element.boltQuantity) || 6, 9),
+      createSvg('circle', { cx: point.x, cy: point.y, r: 4, class: 'bolt' }),
+    );
+    const labelPoint = getOffsetPoint(point, angle, 32);
+    append(group, labelTag(labelPoint.x + 10, labelPoint.y - 20, element.mark));
+    attachElementEvents(group, element);
+    return group;
   };
 
   handleGridPointClick = function handleGridPointClickOverride(pointId) {
