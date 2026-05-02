@@ -3,13 +3,74 @@
   const GUSSET_ASSET = 'assets/gusset_normal.svg';
   const GRID_MARK_ASSET = 'assets/grid_mark.svg';
   const LEVEL_MARK_ASSET = 'assets/level_mark.svg';
-  const BRACE_VIEWBOX = { width: 10.185796, height: 205.07343, topPin: 24.45, bottomPin: 180.62 };
+  const BRACE_VIEWBOX = { width: 26.286751, height: 205.07343, topPin: 24.45, bottomPin: 180.62 };
   const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
-  const GUSSET_SIZE = 76;
+  const GUSSET_SIZE = 96;
   const GUSSET_HOST_OFFSET = 32;
   const GUSSET_PIN_LOCAL = { x: 50, y: -38 };
   const originalSetPlacementMode = setPlacementMode;
   const originalPropertiesTemplate = propertiesTemplate;
+
+  function clampNumber(value, min, max, fallback) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(max, Math.max(min, number));
+  }
+
+  function projectCanvasWidthFt() {
+    return clampNumber(state.project?.canvasWidthFt, 10, 200, FEET_PER_CANVAS);
+  }
+
+  function projectCanvasHeightFt() {
+    return clampNumber(state.project?.canvasHeightFt, 10, 200, FEET_PER_CANVAS);
+  }
+
+  canvasSize = function canvasSizeOverride() {
+    return {
+      width: projectCanvasWidthFt() * PIXELS_PER_FOOT,
+      height: projectCanvasHeightFt() * PIXELS_PER_FOOT,
+    };
+  };
+
+  function gridOrigin() {
+    const xLabels = state.project?.xGridLabels || ['A'];
+    const yLabels = verticalLabels();
+    const canvas = canvasSize();
+    const frameWidth = Math.max(0, xLabels.length - 1) * BAY_SPACING;
+    const frameHeight = Math.max(0, yLabels.length - 1) * STORY_HEIGHT;
+    return {
+      x: Math.max(PIXELS_PER_FOOT, (canvas.width - frameWidth) / 2),
+      y: Math.max(PIXELS_PER_FOOT, (canvas.height - frameHeight) / 2),
+    };
+  }
+
+  generateGridPoints = function generateGridPointsOverride(xGridLabels, yGridLabels) {
+    const origin = gridOrigin();
+    const points = [];
+    yGridLabels.forEach((yLabel, yIndex) => {
+      xGridLabels.forEach((xLabel, xIndex) => {
+        points.push({
+          id: gridPointId(xLabel, yLabel),
+          xLabel,
+          yLabel,
+          x: origin.x + xIndex * BAY_SPACING,
+          y: origin.y + yIndex * STORY_HEIGHT,
+        });
+      });
+    });
+    return points;
+  };
+
+  drawingExtents = function drawingExtentsOverride() {
+    const xLabels = state.project?.xGridLabels || ['A'];
+    const yLabels = verticalLabels();
+    const origin = gridOrigin();
+    const minX = origin.x;
+    const minY = origin.y;
+    const maxX = origin.x + (xLabels.length - 1) * BAY_SPACING;
+    const maxY = origin.y + (yLabels.length - 1) * STORY_HEIGHT;
+    return { minX, minY, maxX, maxY, xLabels, yLabels };
+  };
 
   getElementStartEnd = function getElementStartEndOverride(element) {
     if (element.type === 'column') {
@@ -100,6 +161,7 @@
     svg.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`);
     svg.setAttribute('width', size.width);
     svg.setAttribute('height', size.height);
+    svg.style.aspectRatio = `${size.width} / ${size.height}`;
     if (!state.project) return;
     const { minX, minY, maxX, maxY } = drawingExtents();
     renderSheetBackground(svg, size);
@@ -284,6 +346,22 @@
   setPlacementMode = function setPlacementModeOverride(mode) {
     state.pendingStartGussetId = null;
     originalSetPlacementMode(mode);
+  };
+
+  const originalOpenProjectSetup = openProjectSetup;
+  openProjectSetup = function openProjectSetupOverride() {
+    originalOpenProjectSetup();
+    const widthInput = document.getElementById('canvasWidthFt');
+    const heightInput = document.getElementById('canvasHeightFt');
+    if (widthInput) widthInput.value = String(projectCanvasWidthFt());
+    if (heightInput) heightInput.value = String(projectCanvasHeightFt());
+  };
+
+  const originalUpdateProjectInfo = updateProjectInfo;
+  updateProjectInfo = function updateProjectInfoOverride() {
+    originalUpdateProjectInfo();
+    if (!state.project) return;
+    els.projectMeta.textContent = `${state.project.name} - ${projectCanvasWidthFt()}ft x ${projectCanvasHeightFt()}ft canvas`;
   };
 
   function getGussetPinPoint(gussetOrId) {
@@ -687,7 +765,12 @@
     const name = document.getElementById('projectName').value.trim();
     const xGridLabels = parseCsv(document.getElementById('xLabels').value);
     const levels = parseCsv(document.getElementById('levels').value);
+    const canvasWidthFt = clampNumber(document.getElementById('canvasWidthFt')?.value, 10, 200, FEET_PER_CANVAS);
+    const canvasHeightFt = clampNumber(document.getElementById('canvasHeightFt')?.value, 10, 200, FEET_PER_CANVAS);
     setProject(name, xGridLabels, levels, false);
+    state.project.canvasWidthFt = canvasWidthFt;
+    state.project.canvasHeightFt = canvasHeightFt;
+    state.gridPoints = generateGridPoints(state.project.xGridLabels, state.project.yGridLabels);
     closeProjectSetup();
     render();
   };
@@ -708,6 +791,8 @@
 
   initializeDefaultProject = function initializeDefaultProjectOverride() {
     setProject('BRB Frame Layout', ['A', 'B'], ['1', '2'], false);
+    state.project.canvasWidthFt = FEET_PER_CANVAS;
+    state.project.canvasHeightFt = FEET_PER_CANVAS;
     render();
   };
 

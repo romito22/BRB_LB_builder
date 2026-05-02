@@ -2,9 +2,9 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="74.372849mm"
-   height="76.059486mm"
-   viewBox="0 0 74.372849 76.059486"
+   width="105.29844mm"
+   height="105.29846mm"
+   viewBox="0 0 105.29844 105.29846"
    version="1.1"
    id="svg1"
    xmlns="http://www.w3.org/2000/svg"
@@ -13,10 +13,26 @@
      id="defs1" />
   <g
      id="layer1"
-     transform="translate(-21.766053,-20.798232)">
+     transform="translate(-7.6865956,-6.1833572)">
     <path
        id="path7"
-       style="opacity:1;fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:2;stroke-dasharray:none;stroke-opacity:0.803922"
-       d="M 22.766052,21.807454 V 95.857715 H 95.138896 V 66.621257 L 48.887455,22.047233 Z" />
+       style="opacity:1;fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+       d="M 22.766052,21.807454 V 95.857715 L 97.380437,95.578548 V 72.847759 L 52.051277,21.549113 Z" />
+    <path
+       style="fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:0.321848;stroke-dasharray:2.57479, 0.643696, 0.321848, 0.643696;stroke-dashoffset:0;stroke-opacity:0.803922"
+       d="m 22.766052,6.183357 v 105.298453 0 0"
+       id="path1-74-5" />
+    <path
+       style="fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:0.321848;stroke-dasharray:2.57479, 0.643696, 0.321848, 0.643696;stroke-dashoffset:0;stroke-opacity:0.803922"
+       d="M 112.98504,95.739472 H 7.6865956 v 0 0"
+       id="path1-74-5-6" />
+    <path
+       style="fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:0.355066;stroke-dasharray:2.84054, 0.710132, 0.355066, 0.710132;stroke-dashoffset:0;stroke-opacity:0.803922"
+       d="M 93.122285,25.501488 10.980269,107.6435 v 0 0"
+       id="path1-74-5-6-4" />
+    <path
+       style="fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:0.355066;stroke-dasharray:2.84054, 0.710132, 0.355066, 0.710132;stroke-dashoffset:0;stroke-opacity:0.803922"
+       d="M 89.514841,103.21765 14.587714,14.445213 v 0 0"
+       id="path1-74-5-6-4-7" />
   </g>
 </svg>
