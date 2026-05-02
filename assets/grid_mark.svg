@@ -15,11 +15,11 @@
      id="layer1"
      transform="translate(-16.823208,-262.90379)">
     <path
-       style="fill:#000000;fill-opacity:0.997543;stroke:#000000;stroke-width:0.4;stroke-dasharray:3.2, 0.8, 0.4, 0.8;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:currentColor;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.4;stroke-dasharray:3.2, 0.8, 0.4, 0.8;stroke-dashoffset:0;stroke-opacity:1"
        d="M 179.46828,267.59917 H 16.823207 v 0 0"
        id="path1-6-8" />
     <ellipse
-       style="fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:none;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="path2-5"
        cx="183.90663"
        cy="267.59918"

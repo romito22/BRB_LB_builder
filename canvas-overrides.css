@@ -1,11 +1,7 @@
 .canvas-stage {
   overflow: hidden;
   padding: 0;
-  background:
-    linear-gradient(#edf1f5 1px, transparent 1px),
-    linear-gradient(90deg, #edf1f5 1px, transparent 1px),
-    #f6f8fa;
-  background-size: 40px 40px;
+  background: var(--panel-alt);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -16,7 +12,7 @@
 }
 
 .sheet-grid-fill {
-  fill: url(#draftingGrid);
+  fill: transparent;
   pointer-events: none;
 }
 
@@ -28,6 +24,6 @@
 
 .sheet-grid-major {
   fill: none;
-  stroke: #dfe5ec;
+  stroke: var(--canvas-grid);
   stroke-width: 1;
 }

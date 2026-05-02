@@ -15,30 +15,30 @@
      id="layer1"
      transform="translate(-16.833516,-246.83682)">
     <path
-       style="fill:#000000;fill-opacity:0.997543;stroke:#000000;stroke-width:0.4;stroke-dasharray:3.2, 0.8, 0.4, 0.8;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:currentColor;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.4;stroke-dasharray:3.2, 0.8, 0.4, 0.8;stroke-dashoffset:0;stroke-opacity:1"
        d="M 179.47859,251.53219 H 16.833515 v 0 0"
        id="path1-6" />
     <ellipse
-       style="fill:none;fill-opacity:0.997543;stroke:#000000;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:none;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="path2"
        cx="183.91693"
        cy="251.5322"
        rx="4.4383488"
        ry="4.4954066" />
     <path
-       style="fill:#000000;fill-opacity:0.997543;stroke:#000000;stroke-width:0.389257;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:currentColor;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.389257;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        d="m 183.76716,246.86792 v 4.50078 l -4.19814,1e-5"
        id="path3" />
     <path
-       style="fill:#000000;fill-opacity:0.997543;stroke:#000000;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:currentColor;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        d="m 183.91693,247.03679 c -1.05465,0.22726 -2.10929,0.45451 -2.84903,1.20376 -0.73974,0.74925 -1.16453,2.02044 -1.58932,3.29165"
        id="path6" />
     <path
-       style="fill:#000000;fill-opacity:0.997543;stroke:#000000;stroke-width:0.389257;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:currentColor;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.389257;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        d="m 184.0667,256.19647 v -4.50078 l 4.19813,-1e-5"
        id="path3-1" />
     <path
-       style="fill:#000000;fill-opacity:0.997543;stroke:#000000;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:currentColor;fill-opacity:0.997543;stroke:currentColor;stroke-width:0.4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        d="m 183.91693,247.03679 c -1.05465,0.22726 -2.10929,0.45451 -2.84903,1.20376 -0.73974,0.74925 -1.16453,2.02044 -1.58932,3.29165"
        id="path6-8"
        transform="rotate(180,183.91693,251.5322)" />

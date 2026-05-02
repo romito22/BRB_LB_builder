@@ -3,7 +3,7 @@
   --panel-bg: #ffffff;
   --panel-alt: #f5f7f9;
   --canvas-bg: #f6f8fa;
-  --canvas-grid: #edf1f5;
+  --canvas-grid: #7fb3df;
   --border: #d2d8df;
   --border-soft: #e4e8ed;
   --text: #20242a;
@@ -26,7 +26,7 @@ body.theme-dark {
   --panel-bg: #171b20;
   --panel-alt: #14191f;
   --canvas-bg: #10151b;
-  --canvas-grid: #202933;
+  --canvas-grid: #9ca3af;
   --border: #303945;
   --border-soft: #26303a;
   --text: #d7dde5;
@@ -364,11 +364,7 @@ h2 {
   min-height: 0;
   overflow: hidden;
   padding: 0;
-  background:
-    linear-gradient(#edf1f5 1px, transparent 1px),
-    linear-gradient(90deg, #edf1f5 1px, transparent 1px),
-    #f6f8fa;
-  background-size: 40px 40px;
+  background: var(--panel-alt);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -418,7 +414,7 @@ h2 {
 }
 
 .sheet-grid-fill {
-  fill: url(#draftingGrid);
+  fill: transparent;
   pointer-events: none;
 }
 
@@ -430,8 +426,23 @@ h2 {
 
 .sheet-grid-major {
   fill: none;
-  stroke: #dfe5ec;
+  stroke: var(--canvas-grid);
   stroke-width: 1;
+}
+
+.workspace-grid {
+  pointer-events: none;
+}
+
+.workspace-grid-bg {
+  fill: var(--canvas-bg);
+}
+
+.workspace-grid-line {
+  fill: none;
+  stroke: var(--canvas-grid);
+  stroke-width: 0.75;
+  vector-effect: non-scaling-stroke;
 }
 
 .sheet-title-line {
@@ -884,11 +895,7 @@ body.theme-dark .central-canvas {
 }
 
 body.theme-dark .canvas-stage {
-  background:
-    linear-gradient(var(--canvas-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px),
-    var(--canvas-bg);
-  background-size: 40px 40px;
+  background: var(--panel-alt);
 }
 
 body.theme-dark .brand-wrap p,
@@ -1027,5 +1034,5 @@ body.theme-dark .gusset-asset,
 body.theme-dark .grid-mark-asset,
 body.theme-dark .library-symbol.brb::before,
 body.theme-dark .library-symbol.gusset::before {
-  filter: invert(1) brightness(1.35);
+  filter: invert(1) brightness(1.7) contrast(1.15);
 }

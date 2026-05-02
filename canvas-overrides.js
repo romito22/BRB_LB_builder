@@ -135,22 +135,19 @@
   };
 
   renderSheetBackground = function renderSheetBackgroundOverride(svg, size) {
-    const defs = createSvg('defs');
-    const pattern = createSvg('pattern', {
-      id: 'draftingGrid',
-      width: PIXELS_PER_FOOT,
-      height: PIXELS_PER_FOOT,
-      patternUnits: 'userSpaceOnUse',
-    });
-    append(pattern,
-      createSvg('path', { d: `M ${PIXELS_PER_FOOT} 0 V ${PIXELS_PER_FOOT} M 0 ${PIXELS_PER_FOOT} H ${PIXELS_PER_FOOT}`, class: 'sheet-grid-major' }),
-    );
-    append(defs, pattern);
-    append(svg, defs);
-    append(svg,
-      createSvg('rect', { x: 0, y: 0, width: size.width, height: size.height, class: 'drawing-sheet' }),
-      createSvg('rect', { x: 0, y: 0, width: size.width, height: size.height, class: 'sheet-grid-fill' }),
-    );
+    const group = createSvg('g', { class: 'workspace-grid', 'aria-hidden': 'true' });
+    append(group, createSvg('rect', { x: 0, y: 0, width: size.width, height: size.height, class: 'workspace-grid-bg' }));
+    const verticalCount = Math.round(size.width / PIXELS_PER_FOOT);
+    const horizontalCount = Math.round(size.height / PIXELS_PER_FOOT);
+    for (let index = 0; index <= verticalCount; index += 1) {
+      const x = index * PIXELS_PER_FOOT;
+      append(group, createSvg('line', { x1: x, y1: 0, x2: x, y2: size.height, class: 'workspace-grid-line' }));
+    }
+    for (let index = 0; index <= horizontalCount; index += 1) {
+      const y = index * PIXELS_PER_FOOT;
+      append(group, createSvg('line', { x1: 0, y1: y, x2: size.width, y2: y, class: 'workspace-grid-line' }));
+    }
+    append(svg, group);
   };
 
   renderCanvas = function renderCanvasOverride() {
