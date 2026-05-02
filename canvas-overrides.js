@@ -21,6 +21,36 @@
   const GUSSET_PIN_LOCAL = { x: 50, y: -38 };
   const originalSetPlacementMode = setPlacementMode;
   const originalPropertiesTemplate = propertiesTemplate;
+  const originalNextElementId = nextElementId;
+  const originalNextMark = nextMark;
+
+  nextElementId = function nextElementIdOverride(type) {
+    if (type === 'slab') {
+      const count = state.elements.filter(element => element.type === type).length + 1;
+      return `SLAB-${String(count).padStart(3, '0')}`;
+    }
+    if (type === 'basePlate') {
+      const count = state.elements.filter(element => element.type === type).length + 1;
+      return `BP-${String(count).padStart(3, '0')}`;
+    }
+    if (type === 'footing') {
+      const count = state.elements.filter(element => element.type === type).length + 1;
+      return `FT-${String(count).padStart(3, '0')}`;
+    }
+    if (type === 'workPoint') {
+      const count = state.elements.filter(element => element.type === type).length + 1;
+      return `WP-${String(count).padStart(3, '0')}`;
+    }
+    return originalNextElementId(type);
+  };
+
+  nextMark = function nextMarkOverride(type) {
+    if (type === 'slab') {
+      const count = state.elements.filter(element => element.type === type).length + 1;
+      return `S-${count}`;
+    }
+    return originalNextMark(type);
+  };
 
   pointOptions = function pointOptionsOverride(selected) {
     const values = state.gridPoints.map(point => point.id);
@@ -285,7 +315,7 @@
       }
       return [pointForColumnLevel(element, element.baseLevel), pointForColumnLevel(element, element.topLevel)];
     }
-    if (element.type === 'beam') {
+    if (element.type === 'beam' || element.type === 'slab') {
       return [getPointById(element.startGridPointId), getPointById(element.endGridPointId)];
     }
     if (element.type === 'brb') {
