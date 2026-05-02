@@ -605,11 +605,20 @@ h2 {
 }
 
 .gusset-sketch,
-.gusset-element polygon {
+.gusset-element polygon,
+.gusset-plate-body {
   fill: var(--gusset-fill);
   stroke: var(--object-stroke);
   stroke-width: 2;
   stroke-linejoin: round;
+}
+
+.gusset-axis-line {
+  stroke: var(--object-stroke);
+  stroke-dasharray: 12 5 2 5;
+  stroke-opacity: 0.78;
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
 }
 
 .bolt {
@@ -1132,7 +1141,8 @@ body.theme-dark .connection-plate {
 }
 
 body.theme-dark .gusset-sketch,
-body.theme-dark .gusset-element polygon {
+body.theme-dark .gusset-element polygon,
+body.theme-dark .gusset-plate-body {
   fill: var(--gusset-fill);
 }
 
@@ -1151,6 +1161,7 @@ body.theme-dark .beam-flange,
 body.theme-dark .brb-pin-line,
 body.theme-dark .member-centerline,
 body.theme-dark .brb-centerline,
+body.theme-dark .gusset-axis-line,
 body.theme-dark .dimension-line,
 body.theme-dark .extension-line {
   stroke: #e5e7eb;

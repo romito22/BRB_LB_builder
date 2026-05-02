@@ -6,6 +6,9 @@
   const BRACE_VIEWBOX = { width: 26.286751, height: 205.07343, topPin: 24.45, bottomPin: 180.62 };
   const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
   const GUSSET_SIZE = 96;
+  const MEMBER_HALF_WIDTH = 12;
+  const GUSSET_SHORT_LEG = 68;
+  const GUSSET_LONG_LEG = 96;
   const GUSSET_HOST_OFFSET = 32;
   const GUSSET_PIN_LOCAL = { x: 50, y: -38 };
   const originalSetPlacementMode = setPlacementMode;
@@ -408,6 +411,66 @@
     return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
   }
 
+  function elementById(id, type = '') {
+    return state.elements.find(item => item.id === id && (!type || item.type === type));
+  }
+
+  function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+  }
+
+  function projectPointToSegment(point, start, end) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lengthSq = dx * dx + dy * dy;
+    if (!lengthSq) return { ...start };
+    const t = clamp01(((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq);
+    return { x: start.x + dx * t, y: start.y + dy * t };
+  }
+
+  function distanceToSegment(point, start, end) {
+    return distanceToPoint(point, projectPointToSegment(point, start, end));
+  }
+
+  function pointOnHost(host, point, tolerance = MEMBER_HALF_WIDTH + 8) {
+    const [start, end] = getElementStartEnd(host);
+    if (!start || !end || !point) return false;
+    return distanceToSegment(point, start, end) <= tolerance;
+  }
+
+  function snapHostPoint(host, svgPoint) {
+    const [start, end] = getElementStartEnd(host);
+    if (!start || !end) return null;
+    const projected = projectPointToSegment(svgPoint, start, end);
+    const nearestEndpoint = distanceToPoint(start, projected) <= distanceToPoint(end, projected) ? start : end;
+    if (distanceToPoint(nearestEndpoint, projected) <= SNAP_DISTANCE) return nearestEndpoint;
+    return findNearestGridPoint(projected, PIXELS_PER_FOOT / 2) || {
+      id: workspacePointId(Math.round(projected.x / PIXELS_PER_FOOT), Math.round(projected.y / PIXELS_PER_FOOT)),
+      x: Math.round(projected.x / PIXELS_PER_FOOT) * PIXELS_PER_FOOT,
+      y: Math.round(projected.y / PIXELS_PER_FOOT) * PIXELS_PER_FOOT,
+      isWorkspacePoint: true,
+    };
+  }
+
+  function hostsForGusset(anchorPoint, preferredHost = null) {
+    const hosts = { column: null, beam: null };
+    if (preferredHost?.type === 'column') hosts.column = preferredHost;
+    if (preferredHost?.type === 'beam') hosts.beam = preferredHost;
+    if (!hosts.column) hosts.column = state.elements.find(item => item.type === 'column' && pointOnHost(item, anchorPoint, MEMBER_HALF_WIDTH + 10)) || null;
+    if (!hosts.beam) hosts.beam = state.elements.find(item => item.type === 'beam' && pointOnHost(item, anchorPoint, MEMBER_HALF_WIDTH + 10)) || null;
+    return hosts;
+  }
+
+  function updateGussetHosts(element, preferredHost = null) {
+    if (!element || element.type !== 'gusset') return;
+    const anchor = getPointById(element.attachedGridPointId);
+    if (!anchor) return;
+    const hosts = hostsForGusset(anchor, preferredHost || elementById(element.hostElementId));
+    element.hostColumnId = hosts.column?.id || '';
+    element.hostBeamId = hosts.beam?.id || '';
+    element.hostElementId = preferredHost?.id || element.hostColumnId || element.hostBeamId || element.hostElementId || '';
+  }
+
   function rotateLocal(point, angle, side = 1) {
     const y = point.y * side;
     return {
@@ -430,15 +493,79 @@
   }
 
   function gussetPlacementFor(element, point) {
-    const node = getPointById(element.attachedGridPointId) || point;
+    const anchor = getPointById(element.attachedGridPointId) || point;
     const center = frameCenterPoint();
-    const inward = unitVector(node, center);
-    const corner = {
-      x: node.x + inward.x * GUSSET_HOST_OFFSET,
-      y: node.y + inward.y * GUSSET_HOST_OFFSET,
+    const column = elementById(element.hostColumnId, 'column') || elementById(element.hostElementId, 'column');
+    const beam = elementById(element.hostBeamId, 'beam') || elementById(element.hostElementId, 'beam');
+    const hosts = hostsForGusset(anchor, column || beam);
+    const hostColumn = column || hosts.column;
+    const hostBeam = beam || hosts.beam;
+    const xDir = center.x >= anchor.x ? 1 : -1;
+    const yDir = center.y >= anchor.y ? 1 : -1;
+    const base = {
+      x: hostColumn ? anchor.x + xDir * MEMBER_HALF_WIDTH : anchor.x,
+      y: hostBeam ? anchor.y + yDir * MEMBER_HALF_WIDTH : anchor.y,
     };
-    const angle = getAngle(corner, center);
-    return { corner, angle, side: normalSideTowardFrame(corner, angle) };
+    let points;
+    if (hostColumn && hostBeam) {
+      points = [
+        base,
+        { x: base.x + xDir * GUSSET_LONG_LEG, y: base.y },
+        { x: base.x + xDir * GUSSET_LONG_LEG, y: base.y + yDir * GUSSET_SHORT_LEG },
+        { x: base.x + xDir * GUSSET_SHORT_LEG, y: base.y + yDir * GUSSET_LONG_LEG },
+        { x: base.x, y: base.y + yDir * GUSSET_LONG_LEG },
+      ];
+    } else if (hostBeam) {
+      points = [
+        { x: base.x - xDir * GUSSET_SHORT_LEG * 0.5, y: base.y },
+        { x: base.x + xDir * GUSSET_SHORT_LEG * 0.5, y: base.y },
+        { x: base.x + xDir * GUSSET_SHORT_LEG * 0.85, y: base.y + yDir * GUSSET_SHORT_LEG },
+        { x: base.x, y: base.y + yDir * GUSSET_LONG_LEG },
+        { x: base.x - xDir * GUSSET_SHORT_LEG * 0.85, y: base.y + yDir * GUSSET_SHORT_LEG },
+      ];
+    } else if (hostColumn) {
+      points = [
+        { x: base.x, y: base.y - yDir * GUSSET_SHORT_LEG * 0.5 },
+        { x: base.x + xDir * GUSSET_SHORT_LEG, y: base.y - yDir * GUSSET_SHORT_LEG * 0.85 },
+        { x: base.x + xDir * GUSSET_LONG_LEG, y: base.y },
+        { x: base.x + xDir * GUSSET_SHORT_LEG, y: base.y + yDir * GUSSET_SHORT_LEG * 0.85 },
+        { x: base.x, y: base.y + yDir * GUSSET_SHORT_LEG * 0.5 },
+      ];
+    } else {
+      const inward = unitVector(anchor, center);
+      const corner = {
+        x: anchor.x + inward.x * GUSSET_HOST_OFFSET,
+        y: anchor.y + inward.y * GUSSET_HOST_OFFSET,
+      };
+      points = [
+        corner,
+        { x: corner.x + xDir * GUSSET_LONG_LEG, y: corner.y },
+        { x: corner.x + xDir * GUSSET_SHORT_LEG, y: corner.y + yDir * GUSSET_LONG_LEG },
+        { x: corner.x, y: corner.y + yDir * GUSSET_SHORT_LEG },
+      ];
+    }
+    const pin = {
+      x: base.x + xDir * (hostColumn && hostBeam ? 52 : hostColumn ? 58 : 0),
+      y: base.y + yDir * (hostColumn && hostBeam ? 52 : hostBeam ? 58 : 0),
+    };
+    if (!hostColumn && !hostBeam) {
+      pin.x = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+      pin.y = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+    }
+    const axisStart = { x: anchor.x, y: anchor.y };
+    const axisEnd = pin;
+    return {
+      anchor,
+      base,
+      points,
+      pin,
+      axisStart,
+      axisEnd,
+      angle: getAngle(axisStart, axisEnd),
+      side: normalSideTowardFrame(axisStart, getAngle(axisStart, axisEnd)),
+      hostColumn,
+      hostBeam,
+    };
   }
 
   setPlacementMode = function setPlacementModeOverride(mode) {
@@ -474,11 +601,10 @@
     const node = getPointById(element.attachedGridPointId);
     if (!node) return null;
     const placement = gussetPlacementFor(element, node);
-    const pin = rotateLocal(GUSSET_PIN_LOCAL, placement.angle, placement.side);
     return {
       id: element.id,
-      x: placement.corner.x + pin.x,
-      y: placement.corner.y + pin.y,
+      x: placement.pin.x,
+      y: placement.pin.y,
     };
   }
 
@@ -544,16 +670,18 @@
     const node = getPointById(element.attachedGridPointId);
     const group = createSvg('g', { class: `element gusset-element${elementClass(element)}`, 'data-id': element.id });
     if (!node) return group;
-    const { corner, angle, side } = gussetPlacementFor(element, node);
+    updateGussetHosts(element);
+    const placement = gussetPlacementFor(element, node);
     const pinPoint = getGussetPinPoint(element);
     append(
       group,
-      GussetAssetSymbol(corner, angle, side),
+      createSvg('polygon', { points: placement.points.map(item => `${item.x},${item.y}`).join(' '), class: 'gusset-plate-body' }),
+      createSvg('line', { x1: placement.axisStart.x, y1: placement.axisStart.y, x2: placement.axisEnd.x, y2: placement.axisEnd.y, class: 'gusset-axis-line' }),
       pinPoint ? Centerline(node, pinPoint) : null,
-      pinPoint ? BoltPattern(pinPoint, angle, Number(element.boltQuantity) || 6, 9) : null,
+      pinPoint ? BoltPattern(pinPoint, placement.angle, Number(element.boltQuantity) || 6, 9) : null,
       pinPoint ? createSvg('circle', { cx: pinPoint.x, cy: pinPoint.y, r: 4, class: 'bolt' }) : null,
     );
-    const labelPoint = pinPoint || getOffsetPoint(corner, angle, 32);
+    const labelPoint = pinPoint || placement.base;
     append(group, labelTag(labelPoint.x + 10, labelPoint.y - 20, element.mark));
     attachElementEvents(group, element);
     return group;
@@ -561,14 +689,17 @@
 
   function createGussetOnHost(host, svgPoint) {
     if (!host || !['beam', 'column'].includes(host.type)) return;
-    const endpoint = hostEndpointForPoint(host, svgPoint);
-    if (!endpoint) return;
+    const anchor = snapHostPoint(host, svgPoint);
+    if (!anchor) return;
+    const hosts = hostsForGusset(anchor, host);
     const element = {
       id: nextElementId('gusset'),
       type: 'gusset',
       mark: nextMark('gusset'),
-      attachedGridPointId: endpoint.id,
+      attachedGridPointId: anchor.id,
       hostElementId: host.id,
+      hostColumnId: hosts.column?.id || '',
+      hostBeamId: hosts.beam?.id || '',
       attachedToElementId: '',
       thickness: '3/4"',
       width: '18"',
@@ -723,6 +854,7 @@
     if (state.drag.handle === 'point') {
       element.attachedGridPointId = point.id;
       element.attachedToElementId = nearestBrbEndpoint(null, point, 18)?.elementId || element.attachedToElementId || '';
+      updateGussetHosts(element);
     } else if (state.drag.handle === 'end') {
       element.endGridPointId = point.id;
     } else {
@@ -746,6 +878,7 @@
     if (element.type === 'gusset') {
       element.attachedGridPointId = targetStart.id;
       element.attachedToElementId = nearestBrbEndpoint(null, targetStart, 18)?.elementId || element.attachedToElementId || '';
+      updateGussetHosts(element);
       return;
     }
     const targetAddress = gridAddress(targetStart.id);
