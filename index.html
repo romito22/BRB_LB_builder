@@ -18,26 +18,31 @@
           <p id="projectMeta">Structural frame elevation builder</p>
         </div>
       </div>
-      <div class="toolbar-actions" role="toolbar" aria-label="Drawing tools">
-        <button type="button" id="themeToggleBtn" class="ribbon-button theme-toggle" aria-pressed="false" title="Toggle dark mode">
-          <span class="ribbon-icon" id="themeToggleIcon">◐</span>
-          <span id="themeToggleLabel">Dark</span>
-        </button>
-        <button type="button" id="projectSetupBtn" class="ribbon-button">
-          <span class="ribbon-icon">⌗</span>
-          <span>Set Grid</span>
-        </button>
-        <button type="button" id="tableToggleBtn" class="ribbon-button" aria-pressed="true">
-          <span class="ribbon-icon">▤</span>
-          <span id="tableToggleLabel">Hide Table</span>
-        </button>
-        <button type="button" id="deleteSelectedBtn" class="ribbon-button">
-          <span class="ribbon-icon">⌫</span>
-          <span>Delete</span>
-        </button>
-        <button type="button" id="exportCsvBtn" class="ribbon-button">
-          <span class="ribbon-icon">⇩</span>
-          <span>Export</span>
+      <div class="speed-dial" aria-label="Drawing tools">
+        <div class="toolbar-actions" id="toolbarActions" role="toolbar" aria-label="Drawing tools">
+          <button type="button" id="themeToggleBtn" class="ribbon-button theme-toggle" aria-pressed="false" title="Toggle dark mode">
+            <span class="ribbon-icon" id="themeToggleIcon">◐</span>
+            <span class="ribbon-label" id="themeToggleLabel">Dark</span>
+          </button>
+          <button type="button" id="projectSetupBtn" class="ribbon-button">
+            <span class="ribbon-icon">⌗</span>
+            <span class="ribbon-label">Set Grid</span>
+          </button>
+          <button type="button" id="tableToggleBtn" class="ribbon-button" aria-pressed="true">
+            <span class="ribbon-icon">▤</span>
+            <span class="ribbon-label" id="tableToggleLabel">Hide Table</span>
+          </button>
+          <button type="button" id="deleteSelectedBtn" class="ribbon-button">
+            <span class="ribbon-icon">⌫</span>
+            <span class="ribbon-label">Delete</span>
+          </button>
+          <button type="button" id="exportCsvBtn" class="ribbon-button">
+            <span class="ribbon-icon">⇩</span>
+            <span class="ribbon-label">Export</span>
+          </button>
+        </div>
+        <button type="button" class="speed-dial-trigger" aria-controls="toolbarActions" aria-label="Open tools menu">
+          <span aria-hidden="true">+</span>
         </button>
       </div>
     </header>
