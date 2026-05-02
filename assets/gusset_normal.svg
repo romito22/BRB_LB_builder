@@ -11,6 +11,34 @@
    xmlns:svg="http://www.w3.org/2000/svg">
   <defs
      id="defs1" />
+  <metadata
+     id="gusset_anchor_metadata">{"orientation":"base_bottom_left","anchors":{"host_corner":{"x":15.079456,"y":89.674358},"brace_work_point":{"x":47.907853,"y":56.845965}},"edges":{"column_face":[{"x":15.079456,"y":15.624097},{"x":15.079456,"y":89.674358}],"beam_face":[{"x":15.079456,"y":89.674358},{"x":89.693841,"y":89.395191}],"brace_axis":[{"x":15.079456,"y":89.674358},{"x":47.907853,"y":56.845965}],"diagonal_reference":[{"x":6.901118,"y":8.261856},{"x":81.828245,"y":97.034293}]}}</metadata>
+  <g
+     id="semantic_anchors"
+     style="display:none">
+    <circle
+       id="host_corner"
+       cx="15.079456"
+       cy="89.674358"
+       r="1" />
+    <circle
+       id="brace_work_point"
+       cx="47.907853"
+       cy="56.845965"
+       r="1" />
+    <path
+       id="column_face"
+       d="M 15.079456,15.624097 V 89.674358" />
+    <path
+       id="beam_face"
+       d="M 15.079456,89.674358 89.693841,89.395191" />
+    <path
+       id="brace_axis"
+       d="M 15.079456,89.674358 47.907853,56.845965" />
+    <path
+       id="diagonal_reference"
+       d="M 6.901118,8.261856 81.828245,97.034293" />
+  </g>
   <g
      id="layer1"
      transform="translate(-7.6865956,-6.1833572)">

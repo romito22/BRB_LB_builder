@@ -1,0 +1,72 @@
+{
+  "asset": "gusset_normal.svg",
+  "orientation": "base_bottom_left",
+  "viewBox": {
+    "x": 0,
+    "y": 0,
+    "width": 105.29844,
+    "height": 105.29846
+  },
+  "anchors": {
+    "hostCorner": {
+      "label": "1",
+      "description": "Point that lands on the real host corner or host face anchor.",
+      "x": 15.079456,
+      "y": 89.674358
+    },
+    "braceWorkPoint": {
+      "label": "2",
+      "description": "Point where the BRB/brace centerline connects.",
+      "x": 47.907853,
+      "y": 56.845965
+    }
+  },
+  "edges": {
+    "columnFace": {
+      "label": "a",
+      "description": "Vertical edge that aligns to a column face.",
+      "start": {
+        "x": 15.079456,
+        "y": 15.624097
+      },
+      "end": {
+        "x": 15.079456,
+        "y": 89.674358
+      }
+    },
+    "beamFace": {
+      "label": "b",
+      "description": "Horizontal edge that aligns to a beam face.",
+      "start": {
+        "x": 15.079456,
+        "y": 89.674358
+      },
+      "end": {
+        "x": 89.693841,
+        "y": 89.395191
+      }
+    },
+    "braceAxis": {
+      "description": "Reference line from host corner to brace work point.",
+      "start": {
+        "x": 15.079456,
+        "y": 89.674358
+      },
+      "end": {
+        "x": 47.907853,
+        "y": 56.845965
+      }
+    },
+    "diagonalReference": {
+      "description": "Secondary diagonal reference used to detect mirroring/orientation.",
+      "start": {
+        "x": 6.901118,
+        "y": 8.261856
+      },
+      "end": {
+        "x": 81.828245,
+        "y": 97.034293
+      }
+    }
+  }
+}
