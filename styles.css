@@ -111,6 +111,14 @@ button.active {
   height: 100vh;
 }
 
+body.table-hidden .app-shell {
+  grid-template-rows: 64px minmax(520px, 1fr) 0;
+}
+
+body.table-hidden .bottom-data-preview {
+  display: none;
+}
+
 .top-toolbar {
   grid-area: top;
   display: flex;
@@ -187,7 +195,7 @@ h2 {
   align-content: center;
   justify-items: center;
   gap: 2px;
-  min-width: 64px;
+  min-width: 76px;
   height: 54px;
   border-width: 0 0 0 1px;
   border-color: var(--border-soft);
@@ -217,12 +225,12 @@ h2 {
   display: inline-grid;
   align-items: center;
   justify-items: center;
-  min-width: 24px;
+  min-width: 28px;
   height: 24px;
   border: 1px solid transparent;
   border-radius: 4px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1;
 }
@@ -875,6 +883,12 @@ h2 {
   font-size: 14px;
 }
 
+.panel-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .property-form {
   display: grid;
   gap: 11px;
@@ -1023,6 +1037,7 @@ tbody tr[data-id]:hover,
 }
 
 .setup-overlay .modal-form {
+  position: relative;
   width: min(470px, calc(100vw - 40px));
   border: 1px solid #c5cdd6;
   border-radius: 6px;
@@ -1034,6 +1049,27 @@ tbody tr[data-id]:hover,
   display: grid;
   gap: 13px;
   padding: 20px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-grid;
+  align-items: center;
+  justify-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  padding: 0;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--text-strong);
 }
 
 .modal-form p {

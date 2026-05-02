@@ -24,6 +24,113 @@
     return optionList(values, selected);
   };
 
+  state.selectedElementIds = state.selectedElementIds || [];
+
+  function selectionIds() {
+    if (!state.selectedElementIds?.length && state.selectedElementId) {
+      state.selectedElementIds = [state.selectedElementId];
+    }
+    state.selectedElementIds = (state.selectedElementIds || []).filter(id => state.elements.some(element => element.id === id));
+    if (state.selectedElementId && state.elements.some(element => element.id === state.selectedElementId) && !state.selectedElementIds.includes(state.selectedElementId)) {
+      state.selectedElementIds = [state.selectedElementId];
+    } else if (!state.selectedElementIds.includes(state.selectedElementId)) {
+      state.selectedElementId = state.selectedElementIds[state.selectedElementIds.length - 1] || null;
+    }
+    return state.selectedElementIds;
+  }
+
+  function setSelectionIds(ids) {
+    state.selectedElementIds = [...new Set(ids.filter(Boolean))];
+    state.selectedElementId = state.selectedElementIds[state.selectedElementIds.length - 1] || null;
+  }
+
+  function toggleElementSelection(id) {
+    const ids = selectionIds();
+    setSelectionIds(ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id]);
+    render();
+  }
+
+  selectedElement = function selectedElementOverride() {
+    selectionIds();
+    return state.elements.find(element => element.id === state.selectedElementId) || null;
+  };
+
+  setSelectedElement = function setSelectedElementOverride(id, additive = false) {
+    if (additive && id) {
+      toggleElementSelection(id);
+      return;
+    }
+    setSelectionIds(id ? [id] : []);
+    render();
+  };
+
+  elementClass = function elementClassOverride(element) {
+    return selectionIds().includes(element.id) ? ' selected-element' : '';
+  };
+
+  renderSelection = function renderSelectionOverride(svg) {
+    const ids = selectionIds();
+    const selected = ids
+      .map(id => state.elements.find(element => element.id === id))
+      .filter(Boolean);
+    selected.forEach(element => append(svg, selectionOutlineFor(element)));
+    if (selected.length === 1) append(svg, SelectionHandles(selected[0]));
+  };
+
+  renderTable = function renderTableOverride() {
+    const selected = selectionIds();
+    const filtered = state.tableFilter === 'all'
+      ? state.elements
+      : state.elements.filter(element => element.type === state.tableFilter);
+    if (!filtered.length) {
+      els.dataTableBody.innerHTML = '<tr><td colspan="7" class="empty-row">No elements created.</td></tr>';
+      return;
+    }
+    els.dataTableBody.innerHTML = filtered.map(element => `
+      <tr data-id="${escapeHtml(element.id)}" class="${selected.includes(element.id) ? 'selected-row' : ''}">
+        <td>${escapeHtml(element.id)}</td>
+        <td>${escapeHtml(element.type)}</td>
+        <td>${escapeHtml(element.mark)}</td>
+        <td>${escapeHtml(locationFor(element))}</td>
+        <td>${escapeHtml(sizeOrCoreArea(element))}</td>
+        <td>${escapeHtml(levelFor(element))}</td>
+        <td>${escapeHtml(element.notes)}</td>
+      </tr>
+    `).join('');
+    els.dataTableBody.querySelectorAll('tr[data-id]').forEach(row => {
+      row.addEventListener('click', event => setSelectedElement(row.dataset.id, event.metaKey || event.ctrlKey));
+    });
+  };
+
+  renderProperties = function renderPropertiesOverride() {
+    const ids = selectionIds();
+    const element = selectedElement();
+    els.selectedBadge.textContent = ids.length > 1
+      ? `${ids.length} elements selected`
+      : element ? `${element.type.toUpperCase()} ${element.id}` : 'No element selected';
+    if (!element) {
+      els.propertiesPanel.className = 'panel-empty';
+      els.propertiesPanel.textContent = 'No element selected';
+      return;
+    }
+    els.propertiesPanel.className = 'property-form';
+    els.propertiesPanel.innerHTML = ids.length > 1
+      ? `<div class="selection-summary"><span>Multiple selection</span><strong>${ids.length} elements</strong></div><p class="panel-note">Properties show the last selected element. Delete removes all selected elements.</p>${propertiesTemplate(element)}`
+      : propertiesTemplate(element);
+    els.propertiesPanel.querySelectorAll('input, textarea, select').forEach(input => {
+      input.addEventListener('input', () => updateElementField(element.id, input.name, input.value));
+      input.addEventListener('change', () => updateElementField(element.id, input.name, input.value));
+    });
+  };
+
+  deleteSelected = function deleteSelectedOverride() {
+    const ids = selectionIds();
+    if (!ids.length) return;
+    state.elements = state.elements.filter(element => !ids.includes(element.id));
+    setSelectionIds([]);
+    render();
+  };
+
   function clampNumber(value, min, max, fallback) {
     const number = Number(value);
     if (!Number.isFinite(number)) return fallback;
@@ -894,7 +1001,17 @@
     event.stopPropagation();
     event.stopImmediatePropagation?.();
     const [start, end] = getElementStartEnd(element);
-    state.selectedElementId = element.id;
+    if (event.metaKey || event.ctrlKey) {
+      setSelectionIds(selectionIds().includes(element.id)
+        ? selectionIds().filter(id => id !== element.id)
+        : [...selectionIds(), element.id]);
+      state.selectionToggleConsumed = true;
+      render();
+      return;
+    }
+    if (!selectionIds().includes(element.id)) {
+      setSelectionIds([element.id]);
+    }
     state.drag = {
       elementId,
       handle,
@@ -1087,6 +1204,10 @@
         state.justDragged = false;
         return;
       }
+      if (state.selectionToggleConsumed) {
+        state.selectionToggleConsumed = false;
+        return;
+      }
       if (state.placementMode === 'gusset') {
         if (element.type === 'beam' || element.type === 'column') createGussetOnHost(element, svgPoint);
         return render();
@@ -1095,7 +1216,7 @@
         if (element.type === 'gusset') handleGussetForBrace(element.id);
         return render();
       }
-      setSelectedElement(element.id);
+      setSelectedElement(element.id, event.metaKey || event.ctrlKey);
       state.placementMode = 'select';
       state.pendingStartPointId = null;
     });
@@ -1205,7 +1326,7 @@
       button.setAttribute('aria-pressed', String(isDark));
       button.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
     }
-    if (icon) icon.textContent = isDark ? 'L' : 'D';
+    if (icon) icon.textContent = isDark ? '◯' : '◐';
     if (label) label.textContent = isDark ? 'Light' : 'Dark';
   }
 
@@ -1231,7 +1352,55 @@
     applyTheme(nextTheme);
   });
 
+  function setTableVisible(isVisible) {
+    document.body.classList.toggle('table-hidden', !isVisible);
+    const button = document.getElementById('tableToggleBtn');
+    const label = document.getElementById('tableToggleLabel');
+    if (button) {
+      button.setAttribute('aria-pressed', String(isVisible));
+      button.classList.toggle('active', isVisible);
+    }
+    if (label) label.textContent = isVisible ? 'Hide Table' : 'See Table';
+  }
+
+  document.getElementById('tableToggleBtn')?.addEventListener('click', () => {
+    setTableVisible(document.body.classList.contains('table-hidden'));
+  });
+
+  document.getElementById('projectSetupCloseBtn')?.addEventListener('click', () => closeProjectSetup());
+
+  els.deleteSelectedBtn.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    deleteSelected();
+  }, true);
+
+  function isEditingText(event) {
+    const tagName = event.target?.tagName;
+    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || event.target?.isContentEditable;
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      if (els.modal.classList.contains('is-open')) closeProjectSetup();
+      state.pendingStartPointId = null;
+      state.pendingStartGussetId = null;
+      state.drag = null;
+      state.pointerSvgPoint = null;
+      state.snapPointId = null;
+      state.placementMode = 'select';
+      setSelectionIds([]);
+      render();
+      return;
+    }
+    if ((event.key === 'Delete' || event.key === 'Backspace') && !isEditingText(event)) {
+      event.preventDefault();
+      deleteSelected();
+    }
+  });
+
   applyTheme(storedTheme());
+  setTableVisible(true);
 
   initializeDefaultProject = function initializeDefaultProjectOverride() {
     setProject('BRB Frame Layout', ['1', '2'], ['level 1', 'level 2'], false);
