@@ -323,10 +323,10 @@
       return createSvg('circle', { cx: start.x, cy: start.y, r: 56, class: 'selection-outline' });
     }
     if (element.type === 'basePlate') {
-      return createSvg('rect', { x: start.x - 58, y: start.y - 18, width: 116, height: 36, class: 'selection-outline' });
+      return createSvg('rect', { x: start.x - 38, y: start.y - 14, width: 76, height: 28, class: 'selection-outline' });
     }
     if (element.type === 'footing') {
-      return createSvg('rect', { x: start.x - 64, y: start.y - 18, width: 128, height: 36, class: 'selection-outline' });
+      return createSvg('rect', { x: start.x - 44, y: start.y - 14, width: 88, height: 28, class: 'selection-outline' });
     }
     if (element.type === 'workPoint') {
       return createSvg('circle', { cx: start.x, cy: start.y, r: 18, class: 'selection-outline' });
@@ -539,8 +539,8 @@
   }
 
   function BasePlateAssetSymbol(point) {
-    const width = 112;
-    const height = width * BASE_PLATE_VIEWBOX.height / BASE_PLATE_VIEWBOX.width;
+    const width = 72;
+    const height = Math.max(8, width * BASE_PLATE_VIEWBOX.height / BASE_PLATE_VIEWBOX.width);
     const group = createSvg('g', { class: 'base-plate-asset-wrap' });
     append(group,
       createSvg('rect', { x: point.x - width / 2, y: point.y - height / 2, width, height, class: 'base-plate-body' }),
@@ -557,8 +557,8 @@
   }
 
   function FootingAssetSymbol(point) {
-    const width = 124;
-    const height = Math.max(12, width * FOOTING_VIEWBOX.height / FOOTING_VIEWBOX.width);
+    const width = 84;
+    const height = Math.max(9, width * FOOTING_VIEWBOX.height / FOOTING_VIEWBOX.width);
     const group = createSvg('g', { class: 'footing-asset-wrap' });
     append(group,
       createSvg('rect', { x: point.x - width / 2, y: point.y - height / 2, width, height, class: 'footing-body' }),
@@ -908,7 +908,7 @@
     const point = getPointById(element.attachedGridPointId);
     const group = createSvg('g', { class: `element base-plate-element${elementClass(element)}`, 'data-id': element.id });
     if (!point) return group;
-    append(group, BasePlateAssetSymbol(point), labelTag(point.x + 12, point.y - 14, element.mark));
+    append(group, BasePlateAssetSymbol(point), labelTag(point.x + 10, point.y - 12, element.mark));
     attachElementEvents(group, element);
     return group;
   }
@@ -917,7 +917,7 @@
     const point = getPointById(element.attachedGridPointId);
     const group = createSvg('g', { class: `element footing-element${elementClass(element)}`, 'data-id': element.id });
     if (!point) return group;
-    append(group, FootingAssetSymbol(point), labelTag(point.x + 12, point.y - 14, element.mark));
+    append(group, FootingAssetSymbol(point), labelTag(point.x + 10, point.y - 12, element.mark));
     attachElementEvents(group, element);
     return group;
   }
