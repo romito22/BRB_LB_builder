@@ -25,6 +25,22 @@
     return clampNumber(state.project?.canvasHeightFt, 10, 200, FEET_PER_CANVAS);
   }
 
+  function projectBayWidthFt() {
+    return clampNumber(state.project?.bayWidthFt, 1, 100, 8);
+  }
+
+  function projectStoryHeightFt() {
+    return clampNumber(state.project?.storyHeightFt, 1, 100, 8);
+  }
+
+  function projectBaySpacing() {
+    return projectBayWidthFt() * PIXELS_PER_FOOT;
+  }
+
+  function projectStorySpacing() {
+    return projectStoryHeightFt() * PIXELS_PER_FOOT;
+  }
+
   canvasSize = function canvasSizeOverride() {
     return {
       width: projectCanvasWidthFt() * PIXELS_PER_FOOT,
@@ -36,8 +52,8 @@
     const xLabels = state.project?.xGridLabels || ['A'];
     const yLabels = verticalLabels();
     const canvas = canvasSize();
-    const frameWidth = Math.max(0, xLabels.length - 1) * BAY_SPACING;
-    const frameHeight = Math.max(0, yLabels.length - 1) * STORY_HEIGHT;
+    const frameWidth = Math.max(0, xLabels.length - 1) * projectBaySpacing();
+    const frameHeight = Math.max(0, yLabels.length - 1) * projectStorySpacing();
     return {
       x: Math.max(PIXELS_PER_FOOT, (canvas.width - frameWidth) / 2),
       y: Math.max(PIXELS_PER_FOOT, (canvas.height - frameHeight) / 2),
@@ -53,8 +69,8 @@
           id: gridPointId(xLabel, yLabel),
           xLabel,
           yLabel,
-          x: origin.x + xIndex * BAY_SPACING,
-          y: origin.y + yIndex * STORY_HEIGHT,
+          x: origin.x + xIndex * projectBaySpacing(),
+          y: origin.y + yIndex * projectStorySpacing(),
         });
       });
     });
@@ -67,9 +83,50 @@
     const origin = gridOrigin();
     const minX = origin.x;
     const minY = origin.y;
-    const maxX = origin.x + (xLabels.length - 1) * BAY_SPACING;
-    const maxY = origin.y + (yLabels.length - 1) * STORY_HEIGHT;
+    const maxX = origin.x + (xLabels.length - 1) * projectBaySpacing();
+    const maxY = origin.y + (yLabels.length - 1) * projectStorySpacing();
     return { minX, minY, maxX, maxY, xLabels, yLabels };
+  };
+
+  const originalGetPointById = getPointById;
+  getPointById = function getPointByIdWithWorkspaceSnap(pointId) {
+    if (typeof pointId === 'string' && pointId.startsWith('WG-')) {
+      const [, xFt, yFt] = pointId.split('-');
+      const x = Number(xFt) * PIXELS_PER_FOOT;
+      const y = Number(yFt) * PIXELS_PER_FOOT;
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        return { id: pointId, xLabel: `${xFt}ft`, yLabel: `${yFt}ft`, x, y, isWorkspacePoint: true };
+      }
+    }
+    return originalGetPointById(pointId);
+  };
+
+  function workspacePointId(xFt, yFt) {
+    return `WG-${xFt}-${yFt}`;
+  }
+
+  const originalFindNearestGridPoint = findNearestGridPoint;
+  findNearestGridPoint = function findNearestGridPointWithWorkspaceIntersections(svgPoint, maxDistance = Infinity) {
+    const nearestStructural = originalFindNearestGridPoint(svgPoint, maxDistance);
+    if (!svgPoint) return nearestStructural;
+    const size = canvasSize();
+    const xFt = Math.round(svgPoint.x / PIXELS_PER_FOOT);
+    const yFt = Math.round(svgPoint.y / PIXELS_PER_FOOT);
+    if (xFt < 0 || yFt < 0 || xFt > Math.round(size.width / PIXELS_PER_FOOT) || yFt > Math.round(size.height / PIXELS_PER_FOOT)) {
+      return nearestStructural;
+    }
+    const workspacePoint = {
+      id: workspacePointId(xFt, yFt),
+      xLabel: `${xFt}ft`,
+      yLabel: `${yFt}ft`,
+      x: xFt * PIXELS_PER_FOOT,
+      y: yFt * PIXELS_PER_FOOT,
+      isWorkspacePoint: true,
+    };
+    const workspaceDistance = distanceToPoint(workspacePoint, svgPoint);
+    if (workspaceDistance > maxDistance) return nearestStructural;
+    if (!nearestStructural) return workspacePoint;
+    return workspaceDistance <= distanceToPoint(nearestStructural, svgPoint) ? workspacePoint : nearestStructural;
   };
 
   getElementStartEnd = function getElementStartEndOverride(element) {
@@ -194,7 +251,7 @@
   renderGrid = function renderGridWithAssets(svg, minX, minY, maxX, maxY) {
     const levelMarkWidth = Math.min(176, Math.max(124, minX - 16));
     verticalLabels().forEach((label, index) => {
-      const y = SHEET_PAD_TOP + index * STORY_HEIGHT;
+      const y = minY + index * projectStorySpacing();
       append(svg,
         createSvg('line', { x1: minX - 42, y1: y, x2: maxX + 42, y2: y, class: 'grid-line' }),
         MarkAsset(LEVEL_MARK_ASSET, minX - levelMarkWidth, y - MARK_VIEWBOX.height / 2, levelMarkWidth, MARK_VIEWBOX.height),
@@ -203,7 +260,7 @@
     });
 
     state.project.xGridLabels.forEach((label, index) => {
-      const x = SHEET_PAD_X + index * BAY_SPACING;
+      const x = minX + index * projectBaySpacing();
       append(svg, createSvg('line', { x1: x, y1: minY - 42, x2: x, y2: maxY + 42, class: 'grid-line' }));
       append(svg,
         MarkAsset(GRID_MARK_ASSET, -142, -MARK_VIEWBOX.height / 2, 142, MARK_VIEWBOX.height, `translate(${x} ${minY - 28}) rotate(90)`),
@@ -350,15 +407,19 @@
     originalOpenProjectSetup();
     const widthInput = document.getElementById('canvasWidthFt');
     const heightInput = document.getElementById('canvasHeightFt');
+    const bayInput = document.getElementById('bayWidthFt');
+    const storyInput = document.getElementById('storyHeightFt');
     if (widthInput) widthInput.value = String(projectCanvasWidthFt());
     if (heightInput) heightInput.value = String(projectCanvasHeightFt());
+    if (bayInput) bayInput.value = String(projectBayWidthFt());
+    if (storyInput) storyInput.value = String(projectStoryHeightFt());
   };
 
   const originalUpdateProjectInfo = updateProjectInfo;
   updateProjectInfo = function updateProjectInfoOverride() {
     originalUpdateProjectInfo();
     if (!state.project) return;
-    els.projectMeta.textContent = `${state.project.name} - ${projectCanvasWidthFt()}ft x ${projectCanvasHeightFt()}ft canvas`;
+    els.projectMeta.textContent = `${state.project.name} - ${projectCanvasWidthFt()}ft x ${projectCanvasHeightFt()}ft canvas, ${projectBayWidthFt()}ft bays`;
   };
 
   function getGussetPinPoint(gussetOrId) {
@@ -551,6 +612,13 @@
   function gridAddress(pointId) {
     const point = getPointById(pointId);
     if (!point || !state.project) return null;
+    if (point.isWorkspacePoint) {
+      return {
+        xIndex: Math.round(point.x / PIXELS_PER_FOOT),
+        yIndex: Math.round(point.y / PIXELS_PER_FOOT),
+        workspace: true,
+      };
+    }
     return {
       xIndex: state.project.xGridLabels.indexOf(point.xLabel),
       yIndex: verticalLabels().indexOf(point.yLabel),
@@ -560,7 +628,12 @@
   function pointByAddress(xIndex, yIndex) {
     const xLabel = state.project?.xGridLabels?.[xIndex];
     const yLabel = verticalLabels()[yIndex];
-    return xLabel && yLabel ? getPointByLabels(xLabel, yLabel) : null;
+    if (xLabel && yLabel) return getPointByLabels(xLabel, yLabel);
+    const size = canvasSize();
+    const x = xIndex * PIXELS_PER_FOOT;
+    const y = yIndex * PIXELS_PER_FOOT;
+    if (x < 0 || y < 0 || x > size.width || y > size.height) return null;
+    return getPointById(workspacePointId(xIndex, yIndex));
   }
 
   function syncAttachedGussets(element, oldStartGridPointId, oldEndGridPointId) {
@@ -764,9 +837,13 @@
     const levels = parseCsv(document.getElementById('levels').value);
     const canvasWidthFt = clampNumber(document.getElementById('canvasWidthFt')?.value, 10, 200, FEET_PER_CANVAS);
     const canvasHeightFt = clampNumber(document.getElementById('canvasHeightFt')?.value, 10, 200, FEET_PER_CANVAS);
+    const bayWidthFt = clampNumber(document.getElementById('bayWidthFt')?.value, 1, 100, 8);
+    const storyHeightFt = clampNumber(document.getElementById('storyHeightFt')?.value, 1, 100, 8);
     setProject(name, xGridLabels, levels, false);
     state.project.canvasWidthFt = canvasWidthFt;
     state.project.canvasHeightFt = canvasHeightFt;
+    state.project.bayWidthFt = bayWidthFt;
+    state.project.storyHeightFt = storyHeightFt;
     state.gridPoints = generateGridPoints(state.project.xGridLabels, state.project.yGridLabels);
     closeProjectSetup();
     render();
@@ -829,6 +906,9 @@
     setProject('BRB Frame Layout', ['A', 'B'], ['1', '2'], false);
     state.project.canvasWidthFt = FEET_PER_CANVAS;
     state.project.canvasHeightFt = FEET_PER_CANVAS;
+    state.project.bayWidthFt = 8;
+    state.project.storyHeightFt = 8;
+    state.gridPoints = generateGridPoints(state.project.xGridLabels, state.project.yGridLabels);
     render();
   };
 
