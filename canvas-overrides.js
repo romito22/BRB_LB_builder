@@ -1,7 +1,10 @@
 (function () {
   const BRACE_ASSET = 'assets/brace.svg';
   const GUSSET_ASSET = 'assets/gusset_normal.svg';
+  const GRID_MARK_ASSET = 'assets/grid_mark.svg';
+  const LEVEL_MARK_ASSET = 'assets/level_mark.svg';
   const BRACE_VIEWBOX = { width: 11.58579, height: 202.38155, topPin: 13.45, bottomPin: 188.95 };
+  const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
   const GUSSET_SIZE = 76;
   const originalPropertiesTemplate = propertiesTemplate;
 
@@ -23,8 +26,24 @@
     const [start, end] = getElementStartEnd(element);
     if (!start) return null;
     const group = createSvg('g', { class: 'selection-handles' });
-    const points = element.type === 'gusset' ? [start] : [start, end].filter(Boolean);
-    points.forEach(point => append(group, createSvg('circle', { cx: point.x, cy: point.y, r: 7, class: 'selection-grip' })));
+    const handles = element.type === 'gusset'
+      ? [{ point: start, handle: 'point' }]
+      : [
+          { point: start, handle: 'start' },
+          { point: end, handle: 'end' },
+        ].filter(item => item.point);
+    handles.forEach(({ point, handle }) => {
+      const grip = createSvg('circle', {
+        cx: point.x,
+        cy: point.y,
+        r: 8,
+        class: `selection-grip${state.drag?.elementId === element.id && state.drag?.handle === handle ? ' is-dragging' : ''}`,
+        'data-drag-handle': handle,
+      });
+      grip.addEventListener('pointerdown', event => beginElementDrag(event, element.id, handle));
+      append(group, grip);
+    });
+    const points = handles.map(item => item.point);
     append(group, labelTag(points[0].x + 12, points[0].y - 14, `${element.mark} selected`, 'start', 'selection-tag'));
     return group;
   };
@@ -60,8 +79,8 @@
     append(defs, pattern);
     append(svg, defs);
     append(svg,
-      createSvg('rect', { x: 24, y: 24, width: size.width - 48, height: size.height - 48, class: 'drawing-sheet' }),
-      createSvg('rect', { x: 24, y: 24, width: size.width - 48, height: size.height - 48, class: 'sheet-grid-fill' }),
+      createSvg('rect', { x: 0, y: 0, width: size.width, height: size.height, class: 'drawing-sheet' }),
+      createSvg('rect', { x: 0, y: 0, width: size.width, height: size.height, class: 'sheet-grid-fill' }),
     );
   };
 
@@ -85,6 +104,48 @@
     renderSelection(svg);
     renderGridPoints(svg);
     renderPlacementPreview(svg);
+  };
+
+  function MarkAsset(href, x, y, width, height, transform = '') {
+    return assetImage(href, {
+      x,
+      y,
+      width,
+      height,
+      preserveAspectRatio: 'none',
+      class: 'grid-mark-asset',
+      transform,
+    });
+  }
+
+  function renderMarkerText(svg, x, y, text, className = 'grid-label') {
+    const label = createSvg('text', { x, y, class: className, 'text-anchor': 'middle' });
+    label.textContent = text;
+    append(svg, label);
+  }
+
+  renderGrid = function renderGridWithAssets(svg, minX, minY, maxX, maxY) {
+    const levelMarkWidth = Math.min(176, Math.max(124, minX - 16));
+    verticalLabels().forEach((label, index) => {
+      const y = SHEET_PAD_TOP + index * STORY_HEIGHT;
+      append(svg,
+        createSvg('line', { x1: minX - 42, y1: y, x2: maxX + 42, y2: y, class: 'grid-line' }),
+        MarkAsset(LEVEL_MARK_ASSET, minX - levelMarkWidth, y - MARK_VIEWBOX.height / 2, levelMarkWidth, MARK_VIEWBOX.height),
+      );
+      append(svg, labelTag(minX - levelMarkWidth + 8, y + 4, label, 'start'));
+    });
+
+    state.project.xGridLabels.forEach((label, index) => {
+      const x = SHEET_PAD_X + index * BAY_SPACING;
+      append(svg, createSvg('line', { x1: x, y1: minY - 42, x2: x, y2: maxY + 42, class: 'grid-line' }));
+      append(svg,
+        MarkAsset(GRID_MARK_ASSET, -142, -MARK_VIEWBOX.height / 2, 142, MARK_VIEWBOX.height, `translate(${x} ${minY - 28}) rotate(90)`),
+        MarkAsset(GRID_MARK_ASSET, -142, -MARK_VIEWBOX.height / 2, 142, MARK_VIEWBOX.height, `translate(${x} ${maxY + 28}) rotate(-90)`),
+      );
+      renderMarkerText(svg, x, minY - 66, label);
+      renderMarkerText(svg, x, maxY + 76, label);
+    });
+    append(svg, createSvg('line', { x1: 52, y1: maxY + 104, x2: maxX + 116, y2: maxY + 104, class: 'sheet-title-line' }));
   };
 
   renderPlacementPreview = function renderPlacementPreviewOverride(svg) {
@@ -122,6 +183,7 @@
       ...attrs,
     });
     image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', href);
+    image.setAttribute('draggable', 'false');
     return image;
   }
 
@@ -167,6 +229,33 @@
     return group;
   }
 
+  function frameCenterPoint() {
+    const { minX, minY, maxX, maxY } = drawingExtents();
+    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  }
+
+  function normalSideTowardFrame(point, angle) {
+    const center = frameCenterPoint();
+    const toCenter = { x: center.x - point.x, y: center.y - point.y };
+    const normal = { x: -Math.sin(angle), y: Math.cos(angle) };
+    return normal.x * toCenter.x + normal.y * toCenter.y >= 0 ? 1 : -1;
+  }
+
+  function gussetPlacementFor(element, point) {
+    const brb = state.elements.find(item => item.id === element.attachedToElementId && item.type === 'brb');
+    if (brb) {
+      const [start, end] = getElementStartEnd(brb);
+      if (start && end) {
+        const other = point.id === start.id ? end : start;
+        const angle = getAngle(point, other);
+        return { angle, side: normalSideTowardFrame(point, angle) };
+      }
+    }
+    const center = frameCenterPoint();
+    const angle = getAngle(point, center);
+    return { angle, side: normalSideTowardFrame(point, angle) };
+  }
+
   BRBSymbol = function BRBSymbolAssetOverride(element) {
     const [start, end] = getElementStartEnd(element);
     const group = createSvg('g', { class: `element brb-element${elementClass(element)}`, 'data-id': element.id });
@@ -201,16 +290,7 @@
     const point = getPointById(element.attachedGridPointId);
     const group = createSvg('g', { class: `element gusset-element${elementClass(element)}`, 'data-id': element.id });
     if (!point) return group;
-    const brb = state.elements.find(item => item.id === element.attachedToElementId && item.type === 'brb');
-    let angle = -Math.PI / 4;
-    let side = 1;
-    if (brb) {
-      const [start, end] = getElementStartEnd(brb);
-      if (start && end) {
-        angle = point.id === start.id ? getAngle(start, end) : getAngle(end, start);
-        side = point.id === start.id ? 1 : -1;
-      }
-    }
+    const { angle, side } = gussetPlacementFor(element, point);
     append(
       group,
       GussetAssetSymbol(point, angle, side),
@@ -223,6 +303,132 @@
     attachElementEvents(group, element);
     return group;
   };
+
+  function beginElementDrag(event, elementId, handle = 'body') {
+    if (state.placementMode !== 'select') return;
+    const element = state.elements.find(item => item.id === elementId);
+    if (!element) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    const [start, end] = getElementStartEnd(element);
+    state.selectedElementId = element.id;
+    state.drag = {
+      elementId,
+      handle,
+      didMove: false,
+      startSvgPoint: eventToSvgPoint(event),
+      originalStartGridPointId: element.startGridPointId || element.attachedGridPointId || '',
+      originalEndGridPointId: element.endGridPointId || '',
+      originalStartPoint: start ? { ...start } : null,
+      originalEndPoint: end ? { ...end } : null,
+    };
+    els.frameCanvas.setPointerCapture(event.pointerId);
+    render();
+  }
+
+  function gridAddress(pointId) {
+    const point = getPointById(pointId);
+    if (!point || !state.project) return null;
+    return {
+      xIndex: state.project.xGridLabels.indexOf(point.xLabel),
+      yIndex: verticalLabels().indexOf(point.yLabel),
+    };
+  }
+
+  function pointByAddress(xIndex, yIndex) {
+    const xLabel = state.project?.xGridLabels?.[xIndex];
+    const yLabel = verticalLabels()[yIndex];
+    return xLabel && yLabel ? getPointByLabels(xLabel, yLabel) : null;
+  }
+
+  function syncAttachedGussets(element, oldStartGridPointId, oldEndGridPointId) {
+    if (element.type !== 'brb') return;
+    state.elements.forEach(item => {
+      if (item.type !== 'gusset' || item.attachedToElementId !== element.id) return;
+      if (item.attachedGridPointId === oldStartGridPointId) item.attachedGridPointId = element.startGridPointId;
+      if (item.attachedGridPointId === oldEndGridPointId) item.attachedGridPointId = element.endGridPointId;
+    });
+  }
+
+  function dragEndpointTo(element, point) {
+    const oldStartGridPointId = element.startGridPointId;
+    const oldEndGridPointId = element.endGridPointId;
+    if (state.drag.handle === 'point') {
+      element.attachedGridPointId = point.id;
+      element.attachedToElementId = nearestBrbEndpoint(null, point, 18)?.elementId || element.attachedToElementId || '';
+    } else if (state.drag.handle === 'end') {
+      element.endGridPointId = point.id;
+    } else {
+      element.startGridPointId = point.id;
+    }
+    syncAttachedGussets(element, oldStartGridPointId, oldEndGridPointId);
+  }
+
+  function dragBodyTo(element, svgPoint) {
+    const oldStartGridPointId = element.startGridPointId;
+    const oldEndGridPointId = element.endGridPointId;
+    const originalStartId = state.drag.originalStartGridPointId;
+    const originalEndId = state.drag.originalEndGridPointId;
+    const originalAddress = gridAddress(originalStartId);
+    if (!originalAddress || !state.drag.startSvgPoint || !state.drag.originalStartPoint) return;
+    const targetStart = findNearestGridPoint({
+      x: state.drag.originalStartPoint.x + svgPoint.x - state.drag.startSvgPoint.x,
+      y: state.drag.originalStartPoint.y + svgPoint.y - state.drag.startSvgPoint.y,
+    }, SNAP_DISTANCE);
+    if (!targetStart) return;
+    if (element.type === 'gusset') {
+      element.attachedGridPointId = targetStart.id;
+      element.attachedToElementId = nearestBrbEndpoint(null, targetStart, 18)?.elementId || element.attachedToElementId || '';
+      return;
+    }
+    const targetAddress = gridAddress(targetStart.id);
+    const endAddress = gridAddress(originalEndId);
+    if (!targetAddress || !endAddress) return;
+    const movedEnd = pointByAddress(
+      endAddress.xIndex + targetAddress.xIndex - originalAddress.xIndex,
+      endAddress.yIndex + targetAddress.yIndex - originalAddress.yIndex,
+    );
+    if (!movedEnd) return;
+    element.startGridPointId = targetStart.id;
+    element.endGridPointId = movedEnd.id;
+    syncAttachedGussets(element, oldStartGridPointId, oldEndGridPointId);
+  }
+
+  function handleDragPointerMove(event) {
+    if (!state.drag) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    const element = state.elements.find(item => item.id === state.drag.elementId);
+    if (!element) return;
+    const svgPoint = eventToSvgPoint(event);
+    state.pointerSvgPoint = svgPoint;
+    state.snapPointId = findNearestGridPoint(svgPoint, SNAP_DISTANCE)?.id || null;
+    const distance = Math.hypot(svgPoint.x - state.drag.startSvgPoint.x, svgPoint.y - state.drag.startSvgPoint.y);
+    state.drag.didMove = state.drag.didMove || distance > 3;
+    if (state.drag.handle === 'body') dragBodyTo(element, svgPoint);
+    else if (state.snapPointId) dragEndpointTo(element, getPointById(state.snapPointId));
+    renderCanvas();
+    renderTable();
+  }
+
+  function finishElementDrag(event) {
+    if (!state.drag) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    state.justDragged = state.drag.didMove;
+    state.drag = null;
+    state.pointerSvgPoint = null;
+    state.snapPointId = null;
+    try {
+      els.frameCanvas.releasePointerCapture(event.pointerId);
+    } catch (error) {
+      // Pointer capture may already be released by the browser.
+    }
+    render();
+  }
 
   handleGridPointClick = function handleGridPointClickOverride(pointId) {
     if (state.placementMode === 'gusset') {
@@ -248,6 +454,12 @@
 
   handleCanvasClick = function handleCanvasClickOverride(event) {
     if (!state.project) return;
+    if (state.justDragged) {
+      state.justDragged = false;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.target.closest?.('.element')) return;
     const svgPoint = eventToSvgPoint(event);
     if (state.placementMode === 'column' || state.placementMode === 'beam' || state.placementMode === 'brb' || state.placementMode === 'gusset') {
@@ -256,6 +468,26 @@
       return;
     }
     if (state.placementMode === 'select') setSelectedElement(null);
+  };
+
+  attachElementEvents = function attachElementEventsOverride(node, element) {
+    node.classList.add('drag-target');
+    node.addEventListener('pointerdown', event => beginElementDrag(event, element.id, 'body'));
+    node.addEventListener('click', event => {
+      event.stopPropagation();
+      if (state.justDragged) {
+        state.justDragged = false;
+        return;
+      }
+      if (state.placementMode === 'gusset' && element.type === 'brb') {
+        const point = nearestBrbEndpoint(element, eventToSvgPoint(event));
+        if (point) createGusset(point.id, element.id);
+        return render();
+      }
+      setSelectedElement(element.id);
+      state.placementMode = 'select';
+      state.pendingStartPointId = null;
+    });
   };
 
   propertiesTemplate = function propertiesTemplateOverride(element) {
@@ -316,6 +548,14 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     createProject(event);
+  }, true);
+
+  els.frameCanvas.addEventListener('pointermove', handleDragPointerMove, true);
+  els.frameCanvas.addEventListener('pointerup', finishElementDrag, true);
+  els.frameCanvas.addEventListener('pointercancel', finishElementDrag, true);
+  els.frameCanvas.addEventListener('dragstart', event => {
+    event.preventDefault();
+    event.stopPropagation();
   }, true);
 
   initializeDefaultProject = function initializeDefaultProjectOverride() {

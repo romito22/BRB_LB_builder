@@ -6,6 +6,8 @@
     linear-gradient(90deg, #edf1f5 1px, transparent 1px),
     #f6f8fa;
   background-size: 20px 20px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .drawing-sheet {

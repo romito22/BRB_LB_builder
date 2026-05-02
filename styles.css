@@ -13,6 +13,7 @@ body {
   min-width: 1120px;
   overflow: hidden;
   background: #f3f5f7;
+  user-select: none;
 }
 
 button,
@@ -328,6 +329,8 @@ h2 {
     linear-gradient(90deg, #edf1f5 1px, transparent 1px),
     #f6f8fa;
   background-size: 20px 20px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .frame-canvas {
@@ -337,6 +340,15 @@ h2 {
   min-width: 0;
   min-height: 0;
   background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+
+.frame-canvas image {
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .grid-line {
@@ -348,6 +360,12 @@ h2 {
   fill: #2c3440;
   font-size: 13px;
   font-weight: 800;
+  pointer-events: none;
+}
+
+.grid-mark-asset {
+  opacity: 0.82;
+  pointer-events: none;
 }
 
 .drawing-sheet {
@@ -528,7 +546,23 @@ h2 {
   fill: #ffffff;
   stroke: #f97316;
   stroke-width: 2;
-  pointer-events: none;
+  cursor: grab;
+  pointer-events: all;
+}
+
+.selection-grip:hover,
+.selection-grip.is-dragging {
+  fill: #fff7ed;
+  stroke-width: 3;
+}
+
+.drag-target {
+  cursor: move;
+}
+
+.drag-target.is-dragging,
+.selection-grip.is-dragging {
+  cursor: grabbing;
 }
 
 .placement-preview {
