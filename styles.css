@@ -1126,6 +1126,7 @@ tbody tr[data-id]:hover,
 .modal-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   padding-top: 4px;
 }
 
@@ -1133,6 +1134,12 @@ tbody tr[data-id]:hover,
   border-color: #b91c1c;
   background: #b91c1c;
   color: #ffffff;
+}
+
+.modal-actions .secondary-action {
+  border-color: var(--border);
+  background: var(--button-bg);
+  color: var(--text);
 }
 
 .hidden {

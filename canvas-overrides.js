@@ -170,6 +170,18 @@
     return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   }
 
+  function readProjectSetupValues() {
+    return {
+      name: document.getElementById('projectName').value.trim(),
+      xGridLabels: parseCsv(document.getElementById('xLabels').value),
+      levels: parseCsv(document.getElementById('levels').value),
+      canvasWidthFt: clampNumber(document.getElementById('canvasWidthFt')?.value, 10, 200, FEET_PER_CANVAS),
+      canvasHeightFt: clampNumber(document.getElementById('canvasHeightFt')?.value, 10, 200, FEET_PER_CANVAS),
+      bayWidthFt: clampNumber(document.getElementById('bayWidthFt')?.value, 1, 100, 8),
+      storyHeightFt: clampNumber(document.getElementById('storyHeightFt')?.value, 1, 100, 8),
+    };
+  }
+
   function frameWidthFt() {
     return Math.max(0, (state.project?.xGridLabels?.length || 1) - 1) * projectBayWidthFt();
   }
@@ -985,6 +997,74 @@
     return element;
   }
 
+  function captureElementPointPositions() {
+    const pointFields = ['startGridPointId', 'endGridPointId', 'attachedGridPointId'];
+    const snapshots = new Map();
+    state.elements.forEach(element => {
+      const item = {};
+      pointFields.forEach(field => {
+        if (!element[field]) return;
+        const point = getPointById(element[field]);
+        if (point) item[field] = { id: element[field], x: point.x, y: point.y };
+      });
+      snapshots.set(element.id, item);
+    });
+    return snapshots;
+  }
+
+  function pointIdFromSnapshot(snapshot) {
+    if (!snapshot) return '';
+    const existing = getPointById(snapshot.id);
+    if (existing) return snapshot.id;
+    const xFt = Math.round(snapshot.x / PIXELS_PER_FOOT);
+    const yFt = Math.round(snapshot.y / PIXELS_PER_FOOT);
+    return workspacePointId(xFt, yFt);
+  }
+
+  function restoreElementPointPositions(snapshots) {
+    const pointFields = ['startGridPointId', 'endGridPointId', 'attachedGridPointId'];
+    state.elements.forEach(element => {
+      const item = snapshots.get(element.id);
+      if (!item) return;
+      pointFields.forEach(field => {
+        if (!element[field] || !item[field]) return;
+        element[field] = pointIdFromSnapshot(item[field]);
+      });
+      if (element.type === 'gusset') updateGussetHosts(element);
+    });
+  }
+
+  function applyProjectLayout(values, preserveElements) {
+    const elementSnapshots = preserveElements ? captureElementPointPositions() : null;
+    const existingElements = preserveElements ? state.elements : [];
+    const existingSelection = preserveElements ? selectionIds() : [];
+    const createdAt = state.project?.createdAt || new Date().toISOString();
+    state.project = {
+      id: preserveElements ? state.project?.id || `PRJ-${Date.now()}` : `PRJ-${Date.now()}`,
+      name: values.name,
+      xGridLabels: values.xGridLabels,
+      yGridLabels: values.levels.slice().reverse(),
+      levels: values.levels,
+      createdAt,
+      canvasWidthFt: values.canvasWidthFt,
+      canvasHeightFt: values.canvasHeightFt,
+      bayWidthFt: values.bayWidthFt,
+      storyHeightFt: values.storyHeightFt,
+    };
+    state.gridPoints = generateGridPoints(state.project.xGridLabels, state.project.yGridLabels);
+    if (preserveElements) {
+      state.elements = existingElements;
+      restoreElementPointPositions(elementSnapshots);
+      setSelectionIds(existingSelection.filter(id => state.elements.some(element => element.id === id)));
+    } else {
+      state.elements = [];
+      setSelectionIds([]);
+    }
+    state.pendingStartPointId = null;
+    state.pendingStartGussetId = null;
+    state.placementMode = 'select';
+  }
+
   function createGussetOnHost(host, svgPoint) {
     if (!host || !['beam', 'column'].includes(host.type)) return;
     const anchor = snapHostPoint(host, svgPoint);
@@ -1411,28 +1491,25 @@
 
   createProject = function createProjectOverride(event) {
     event?.preventDefault();
-    const name = document.getElementById('projectName').value.trim();
-    const xGridLabels = parseCsv(document.getElementById('xLabels').value);
-    const levels = parseCsv(document.getElementById('levels').value);
-    const canvasWidthFt = clampNumber(document.getElementById('canvasWidthFt')?.value, 10, 200, FEET_PER_CANVAS);
-    const canvasHeightFt = clampNumber(document.getElementById('canvasHeightFt')?.value, 10, 200, FEET_PER_CANVAS);
-    const bayWidthFt = clampNumber(document.getElementById('bayWidthFt')?.value, 1, 100, 8);
-    const storyHeightFt = clampNumber(document.getElementById('storyHeightFt')?.value, 1, 100, 8);
-    setProject(name, xGridLabels, levels, false);
-    state.project.canvasWidthFt = canvasWidthFt;
-    state.project.canvasHeightFt = canvasHeightFt;
-    state.project.bayWidthFt = bayWidthFt;
-    state.project.storyHeightFt = storyHeightFt;
-    state.gridPoints = generateGridPoints(state.project.xGridLabels, state.project.yGridLabels);
+    applyProjectLayout(readProjectSetupValues(), false);
     closeProjectSetup();
     render();
   };
+
+  function updateProjectLayout(event) {
+    event?.preventDefault();
+    applyProjectLayout(readProjectSetupValues(), true);
+    closeProjectSetup();
+    render();
+  }
 
   els.projectForm.addEventListener('submit', event => {
     event.preventDefault();
     event.stopImmediatePropagation();
     createProject(event);
   }, true);
+
+  document.getElementById('updateGridBtn')?.addEventListener('click', updateProjectLayout);
 
   els.frameCanvas.addEventListener('pointermove', handleDragPointerMove, true);
   els.frameCanvas.addEventListener('pointerup', finishElementDrag, true);
