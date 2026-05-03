@@ -12,12 +12,12 @@
   const FOOTING_VIEWBOX = { width: 45.786095, height: 3.7401545 };
   const WORK_POINT_VIEWBOX = { width: 1.9726186, height: 1.9416088 };
   const MARK_VIEWBOX = { width: 171.72177, height: 9.39082 };
-  const GUSSET_SIZE = 96;
+  const GUSSET_SIZE = 48;
   const MEMBER_HALF_WIDTH = 12;
-  const GUSSET_SHORT_LEG = 68;
-  const GUSSET_LONG_LEG = 96;
-  const GUSSET_HOST_OFFSET = 32;
-  const GUSSET_PIN_LOCAL = { x: 50, y: -38 };
+  const GUSSET_SHORT_LEG = 34;
+  const GUSSET_LONG_LEG = 48;
+  const GUSSET_HOST_OFFSET = 16;
+  const GUSSET_PIN_LOCAL = { x: 25, y: -19 };
   const SLAB_RENDER_HEIGHT = 18;
   const originalSetPlacementMode = setPlacementMode;
   const originalPropertiesTemplate = propertiesTemplate;
@@ -362,7 +362,7 @@
     const [start, end] = getElementStartEnd(element);
     if (!start) return null;
     if (element.type === 'gusset') {
-      return createSvg('circle', { cx: start.x, cy: start.y, r: 56, class: 'selection-outline' });
+      return createSvg('circle', { cx: start.x, cy: start.y, r: 30, class: 'selection-outline' });
     }
     if (element.type === 'basePlate') {
       return createSvg('rect', { x: start.x - 38, y: start.y - 14, width: 76, height: 28, class: 'selection-outline' });
@@ -663,6 +663,21 @@
     return group;
   }
 
+  function SmallBoltPattern(point, angle, count = 4, spacing = 5) {
+    const group = createSvg('g', { class: 'bolt-pattern' });
+    const axis = angle + Math.PI / 2;
+    for (let index = 0; index < count; index += 1) {
+      const offset = index - (count - 1) / 2;
+      append(group, createSvg('circle', {
+        cx: point.x + Math.cos(axis) * spacing * offset,
+        cy: point.y + Math.sin(axis) * spacing * offset,
+        r: 2,
+        class: 'bolt',
+      }));
+    }
+    return group;
+  }
+
   function WorkPointAssetSymbol(point) {
     const radius = 7;
     const assetSize = 16;
@@ -828,8 +843,8 @@
       ];
     }
     const pin = {
-      x: base.x + xDir * (hostColumn && hostBeam ? 52 : hostColumn ? 58 : 0),
-      y: base.y + yDir * (hostColumn && hostBeam ? 52 : hostBeam ? 58 : 0),
+      x: base.x + xDir * (hostColumn && hostBeam ? 26 : hostColumn ? 29 : 0),
+      y: base.y + yDir * (hostColumn && hostBeam ? 26 : hostBeam ? 29 : 0),
     };
     if (!hostColumn && !hostBeam) {
       pin.x = points.reduce((sum, p) => sum + p.x, 0) / points.length;
@@ -961,11 +976,11 @@
       createSvg('polygon', { points: placement.points.map(item => `${item.x},${item.y}`).join(' '), class: 'gusset-plate-body' }),
       createSvg('line', { x1: placement.axisStart.x, y1: placement.axisStart.y, x2: placement.axisEnd.x, y2: placement.axisEnd.y, class: 'gusset-axis-line' }),
       pinPoint ? Centerline(node, pinPoint) : null,
-      pinPoint ? BoltPattern(pinPoint, placement.angle, Number(element.boltQuantity) || 6, 9) : null,
-      pinPoint ? createSvg('circle', { cx: pinPoint.x, cy: pinPoint.y, r: 4, class: 'bolt' }) : null,
+      pinPoint ? SmallBoltPattern(pinPoint, placement.angle, Number(element.boltQuantity) || 6, 5) : null,
+      pinPoint ? createSvg('circle', { cx: pinPoint.x, cy: pinPoint.y, r: 2.5, class: 'bolt' }) : null,
     );
     const labelPoint = pinPoint || placement.base;
-    append(group, labelTag(labelPoint.x + 10, labelPoint.y - 20, element.mark));
+    append(group, labelTag(labelPoint.x + 7, labelPoint.y - 15, element.mark));
     attachElementEvents(group, element);
     return group;
   };
